@@ -1,11 +1,18 @@
 {
-  "error": false,
-  "packet-size": "0KB",
-  "status": "0KB of data was sent...",
-  "site": "https://0KB.org",
-  "Personal_Site": "https://johnle.org",
-  "GitHub": "https://github.com/9-5",
-  "LinkedIn": "https://linkedin.com/in/johnle",
-  "Email_1": "mailto:john@johnle.org",
-  "Email_2": "mailto:john@0kb.org"
+    "0KB.ORG": {
+        "error": false,
+        "packet-size": "0KB",
+        "response": "Every project starts at 0 kilobytes...",
+        "site": "https://0KB.org",
+        "domain-admin": "0@0KB.ORG"
+    },
+    "Contact": {
+        "site": "https://johnle.org",
+        "github": "https://github.com/9-5",
+        "linkedin": "https://linkedin.com/in/johnle",
+        "email": "john@johnle.org"
+    },
+    "Projects": {
+        "portfolio": "Coming soon."
+    }
 }
