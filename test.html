@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>0KB.ORG</title>
+    <!-- Include highlight.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/styles/default.min.css">
+    <!-- Include highlight.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/languages/json.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            // Parse the JSON and replace URLs with clickable links
+            const jsonCode = document.getElementById('jsonCode');
+            const jsonString = jsonCode.textContent;
+            const json = JSON.parse(jsonString);
+            let htmlString = JSON.stringify(json, null, 2);
+            htmlString = htmlString.replace(/("https?:\/\/[^\s]+")/g, '<a href="$1">$1</a>');
+            jsonCode.innerHTML = htmlString;
+
+            // Apply syntax highlighting
+            hljs.highlightElement(jsonCode);
+        });
+    </script>
+</head>
+<body>
+    <pre><code id="jsonCode" class="language-json">
+{
+    "0KB.ORG": {
+        "error": false,
+        "packet-size": "0KB",
+        "response": "Every project starts at 0 kilobytes...",
+        "site": "https://0KB.org",
+        "domain-admin": "0@0KB.ORG"
+    },
+    "Contact": {
+        "site": "https://johnle.org",
+        "github": "https://github.com/9-5",
+        "linkedin": "https://linkedin.com/in/johnle",
+        "email": "john@johnle.org"
+    },
+    "Projects": {
+        "portfolio": "Coming soon."
+    }
+}
+    </code></pre>
+
+
+</body>
+</html>
