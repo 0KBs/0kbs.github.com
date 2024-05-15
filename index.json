@@ -2,11 +2,12 @@
     "0KB.ORG": {
         "error": false,
         "packet-size": "0KB",
-        "response": "Every project starts at 0 kilobytes...",
+        "response": "Coming soon...",
         "site": "https://0KB.org",
         "domain-admin": "0@0KB.ORG"
     },
     "Contact": {
+        "telegram": "https://t.me/zerokilobytes",
         "site": "https://johnle.org",
         "github": "https://github.com/9-5",
         "linkedin": "https://linkedin.com/in/johnle",
