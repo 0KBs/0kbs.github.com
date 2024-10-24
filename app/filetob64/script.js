@@ -1,7 +1,6 @@
 function convertAndOutput() {
     const fileInput = document.getElementById('upload-input');
-    const base64Output = document.getElementById('base64-output');
-    const mimeTypeOutput = document.getElementById('mime-type-output');
+    const b64Textarea = document.getElementById('b64-textarea');
 
     const file = fileInput.files[0];
     if (!file) {
@@ -13,11 +12,11 @@ function convertAndOutput() {
 
     reader.onload = function(e) {
         const base64String = e.target.result.split(',')[1];
-        base64Output.textContent = base64String;
+        b64Textarea.value = base64String;
 
         // Get the MIME type
         const mimeType = file.type || 'application/octet-stream';
-        mimeTypeOutput.textContent = mimeType;
+        document.getElementById('mime-type-output').textContent = mimeType;
     };
 
     reader.onerror = function(e) {
