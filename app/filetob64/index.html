@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload and Conversion</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        #upload-input { margin-bottom: 20px; }
+        #output-container { display: flex; gap: 20px; }
+        #base64-output { white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>File Upload and Conversion</h1>
+    <input type="file" id="upload-input" accept="*/*">
+    <button onclick="convertAndOutput()">Convert to Base64</button>
+    
+    <div id="output-container">
+        <pre id="base64-output">Base64 Output:</pre>
+        <pre id="mime-type-output">MIME Type:</pre>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
