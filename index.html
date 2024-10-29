@@ -63,7 +63,11 @@
         function copyToClipboard() {
             const codeContent = document.querySelector('.code-content').innerText;
             navigator.clipboard.writeText(codeContent).then(() => {
-                alert('Code copied to clipboard!');
+                window.setTimeout(() => {
+                    alert("Copied to clipboard.");
+                window.close();
+            }, 5000);
+
             });
         }
 
