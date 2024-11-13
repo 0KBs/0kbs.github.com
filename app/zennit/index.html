@@ -1,12 +1,18 @@
 <html>
 <head>
-    <title>Zennedit</title>
+    <title>Zennit</title>
     <script src="https://unpkg.com/react/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"></link>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/assets/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/assets/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicon/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Zennit" />
+    <link rel="manifest" href="/assets/favicon/site.webmanifest" />
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -63,6 +69,7 @@
             const [selectedPost, setSelectedPost] = useState(null);
             const [comments, setComments] = useState([]);
             const [sort, setSort] = useState('hot');
+            const [commentSort, setCommentSort] = useState('best');
             const [newSubreddit, setNewSubreddit] = useState('');
             const [showPopup, setShowPopup] = useState(false);
             const [subredditToDelete, setSubredditToDelete] = useState(null);
@@ -82,9 +89,33 @@
                             subreddit: child.data.subreddit_name_prefixed,
                             created_utc: child.data.created_utc,
                             gallery_data: child.data.gallery_data,
-                            media_metadata: child.data.media_metadata
+                            media_metadata: child.data.media_metadata,
+                            pinned: child.data.stickied
                         }));
                         setPosts(fetchedPosts);
+                    });
+            };
+
+            const fetchComments = (postId) => {
+                fetch(`https://www.reddit.com/${selectedSubreddit}/comments/${postId}.json?sort=${commentSort}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const fetchedComments = data[1].data.children.map(child => {
+                            const commentData = {
+                                author: child.data.author,
+                                body: child.data.body,
+                                media_metadata: child.data.media_metadata,
+                                pinned: child.data.stickied
+                            };
+                            if (commentData.body.includes("https://preview.redd.it")) {
+                                const mediaId = Object.keys(commentData.media_metadata)[0];
+                                const media = commentData.media_metadata[mediaId];
+                                commentData.imageUrl = media.s.u.replace(/&amp;/g, '&');
+                                commentData.body = commentData.body.replace(/https:\/\/preview\.redd\.it\S+/g, '');
+                            }
+                            return commentData;
+                        });
+                        setComments(fetchedComments);
                     });
             };
 
@@ -103,25 +134,7 @@
             const viewPost = (postId) => {
                 const post = posts.find(p => p.id === postId);
                 setSelectedPost(post);
-                fetch(`https://www.reddit.com/${selectedSubreddit}/comments/${postId}.json`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const fetchedComments = data[1].data.children.map(child => {
-                            const commentData = {
-                                author: child.data.author,
-                                body: child.data.body,
-                                media_metadata: child.data.media_metadata
-                            };
-                            if (commentData.body.includes("https://preview.redd.it")) {
-                                const mediaId = Object.keys(commentData.media_metadata)[0];
-                                const media = commentData.media_metadata[mediaId];
-                                commentData.imageUrl = media.s.u.replace(/&amp;/g, '&');
-                                commentData.body = commentData.body.replace(/https:\/\/preview\.redd\.it\S+/g, '');
-                            }
-                            return commentData;
-                        });
-                        setComments(fetchedComments);
-                    });
+                fetchComments(postId);
             };
 
             const addSubreddit = () => {
@@ -240,13 +253,27 @@
                 return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
             };
 
+            const renderPostContent = (post) => {
+                if (post.url && post.url.includes("https://www.reddit.com/gallery/")) {
+                    return renderGallery(post);
+                } else if (post.url && !post.url.includes("/comments/")) {
+                    const isRedditUrl = post.url.includes("reddit.com") || post.url.includes("redd.it");
+                    return isRedditUrl ? (
+                        <img src={post.url} alt="Post content" className="mt-2 rounded max-w-full" />
+                    ) : (
+                        <a href={post.url} className="text-blue-500 underline mt-2 block">{post.url}</a>
+                    );
+                }
+                return null;
+            };
+
             return (
                 <div className="flex h-screen">
                     <div ref={sidebarRef} className={`fixed inset-y-0 left-0 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out w-64 bg-gray-900 p-4 z-50`}>
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center">
-                                <i className="fab fa-reddit text-white text-2xl"></i>
-                                <span className="ml-2 text-white text-xl">Zennedit</span>
+                                <img src="assets/favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
+                                <span className="ml-2 text-white text-xl">Zennit</span>
                             </div>
                             <button className="text-white" onClick={() => setSidebarOpen(false)}>
                                 <i className="fas fa-arrow-left"></i>
@@ -278,16 +305,12 @@
                     </div>
                     <div className="flex-1 bg-gray-800 p-4 flex flex-col">
                         <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center">
-                                <button className="text-white mr-4" onClick={() => setSidebarOpen(!sidebarOpen)}>
-                                    <i className="fas fa-bars"></i>
+                            <div className="flex items-center cursor-pointer" onClick={() => setSelectedPost(null)}>
+                                <button className="text-white mr-4" onClick={() => setSidebarOpen(true)}>
+                                    <img src="assets/favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
                                 </button>
-                                <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center text-white">
-                                    <i className="fab fa-reddit text-2xl"></i>
-                                </div>
                                 <div className="ml-2">
-                                    <div className="text-white">{selectedSubreddit}</div>
-                                    <div className="text-gray-400 text-sm">Posts</div>
+                                    <div className="text-white text-xl sm:text-2xl">{selectedSubreddit}</div>
                                 </div>
                             </div>
                             <div className="flex items-center">
@@ -305,21 +328,36 @@
                         <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
                             {selectedPost ? (
                                 <div>
-                                    <div className="text-white bg-gray-700 p-2 rounded mt-1">{selectedPost.title}</div>
+                                    <div className="text-white bg-gray-700 p-2 rounded mt-1 flex items-center">
+                                        {selectedPost.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
+                                        <span>{selectedPost.title}</span>
+                                    </div>
                                     <div className="text-gray-400 text-sm mt-1 flex justify-between">
                                         <span>by {selectedPost.author}</span>
                                         <span>{formatDate(selectedPost.created_utc)}</span>
                                     </div>
                                     <div className="text-white bg-gray-700 p-2 rounded mt-1">{renderFormattedText(selectedPost.content)}</div>
-                                    {selectedPost.url && selectedPost.url.includes("https://www.reddit.com/gallery/") ? (
-                                        renderGallery(selectedPost)
-                                    ) : (
-                                        selectedPost.url && !selectedPost.url.includes("/comments/") && <img src={selectedPost.url} alt="Post content" className="mt-2 rounded max-w-full" />
-                                    )}
+                                    {renderPostContent(selectedPost)}
+                                    <div className="flex items-center justify-between mt-4">
+                                        <div className="flex items-center">
+                                            <select className="p-2 bg-gray-700 text-white rounded" value={commentSort} onChange={(e) => { setCommentSort(e.target.value); fetchComments(selectedPost.id); }}>
+                                                <option value="best">Best</option>
+                                                <option value="top">Top</option>
+                                                <option value="new">New</option>
+                                                <option value="controversial">Controversial</option>
+                                            </select>
+                                            <button className="text-white ml-4" onClick={() => fetchComments(selectedPost.id)}>
+                                                <i className="fas fa-sync-alt"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div className="text-gray-400 text-sm mt-1">Comments</div>
                                     {comments.map((comment, index) => (
                                         <div className="text-white bg-gray-700 p-2 rounded mt-1" key={index}>
-                                            <div className="text-gray-400 text-sm">by {comment.author}</div>
+                                            <div className="flex items-center text-gray-400 text-sm">
+                                                <span>by {comment.author}</span>
+                                                {comment.pinned && <i className="fas fa-thumbtack text-yellow-500 ml-2"></i>}
+                                            </div>
                                             <div>{renderFormattedText(comment.body)}</div>
                                             {comment.imageUrl && <img src={comment.imageUrl} alt="Comment embedded content" className="mt-2 rounded" height="35%" width="35%" />}
                                         </div>
@@ -330,7 +368,10 @@
                                 posts.map((post, index) => (
                                     <div className="mb-4" key={index}>
                                         <div className="text-white bg-gray-700 p-2 rounded mt-1 flex justify-between items-center">
-                                            <span>{post.title}</span>
+                                            <div className="flex items-center">
+                                                {post.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
+                                                <span>{post.title}</span>
+                                            </div>
                                             <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => viewPost(post.id)}>View Post</button>
                                         </div>
                                         <div className="text-gray-400 text-sm mt-1 flex justify-between">
