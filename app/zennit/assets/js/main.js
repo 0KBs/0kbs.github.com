@@ -1,6 +1,7 @@
 const { useState, useEffect, useRef } = React;
 
 const App = () => {
+    const [contentBlockerDetected, setContentBlockerDetected] = useState(false);
     const [subreddits, setSubreddits] = useState(() => {
         const savedSubreddits = localStorage.getItem('subreddits');
         return savedSubreddits ? JSON.parse(savedSubreddits) : [{ name: 'r/technology' }];
@@ -22,7 +23,13 @@ const App = () => {
 
     const fetchPosts = () => {
         fetch(`https://www.reddit.com/${selectedSubreddit}/${sort}.json`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    setContentBlockerDetected(true);
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
                 const fetchedPosts = data.data.children.map(child => ({
                     id: child.data.id,
@@ -37,6 +44,11 @@ const App = () => {
                     pinned: child.data.stickied
                 }));
                 setPosts(fetchedPosts);
+                setContentBlockerDetected(true);
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                setContentBlockerDetected(true);
             });
     };
 
@@ -248,6 +260,17 @@ const App = () => {
                 </div>
             </div>
             <div className="flex-1 bg-gray-800 p-4 flex flex-col">
+            {contentBlockerDetected && (
+                <div className="bg-red-600 text-white p-4 rounded mb-4">
+                    <p>It seems that a content blocker is preventing posts from being fetched. Please disable your content blocker and refresh the page.</p>
+                    <button 
+                        className="mt-2 p-2 bg-gray-700 text-white rounded" 
+                        onClick={() => window.location.reload()}
+                    >
+                        Refresh Page
+                    </button>
+                </div>
+            )}
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center cursor-pointer" onClick={() => setSelectedPost(null)}>
                         <button className="text-white mr-4" onClick={() => setSidebarOpen(true)}>
