@@ -216,7 +216,7 @@ const App = () => {
             <div ref={sidebarRef} className={`fixed inset-y-0 left-0 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out w-64 bg-gray-900 p-4 z-50`}>
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center">
-                        <img src="assets/favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
+                        <img src="../favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
                         <span className="ml-2 text-white text-xl">Zennit</span>
                     </div>
                     <button className="text-white" onClick={() => setSidebarOpen(false)}>
@@ -251,7 +251,7 @@ const App = () => {
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center cursor-pointer" onClick={() => setSelectedPost(null)}>
                         <button className="text-white mr-4" onClick={() => setSidebarOpen(true)}>
-                            <img src="assets/favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
+                            <img src="../favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
                         </button>
                         <div className="ml-2">
                             <div className="text-white text-xl sm:text-2xl">{selectedSubreddit}</div>
