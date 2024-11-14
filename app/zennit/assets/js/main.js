@@ -44,7 +44,7 @@ const App = () => {
                     pinned: child.data.stickied
                 }));
                 setPosts(fetchedPosts);
-                setContentBlockerDetected(true);
+                setContentBlockerDetected(false);
             })
             .catch(error => {
                 console.error('Fetch error:', error);
