@@ -20,6 +20,7 @@ const App = () => {
     const [subredditToDelete, setSubredditToDelete] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const sidebarRef = useRef(null);
+    const [commentVisibility, setCommentVisibility] = useState([]);
 
     const fetchPosts = () => {
         fetch(`https://www.reddit.com/${selectedSubreddit}/${sort}.json`)
@@ -65,16 +66,18 @@ const App = () => {
                         pinned: child.data.stickied,
                         ups: child.data.ups - child.data.downs
                     };
-                    if (commentData.body.includes("https://preview.redd.it")) {
-                        const mediaId = Object.keys(commentData.media_metadata)[0];
-                        const media = commentData.media_metadata[mediaId];
-                        commentData.imageUrl = media.s.u.replace(/&amp;/g, '&');
-                        commentData.body = commentData.body.replace(/https:\/\/preview\.redd\.it\S+/g, '');
-                    }
-                    return commentData;
+                    // Initialize visibility state for each comment
+                    return { ...commentData, isVisible: true };
                 });
                 setComments(fetchedComments);
+                setCommentVisibility(new Array(fetchedComments.length).fill(true)); // All comments start as visible
             });
+    };
+
+    const toggleCommentVisibility = (index) => {
+        const updatedVisibility = [...commentVisibility];
+        updatedVisibility[index] = !updatedVisibility[index]; // Toggle the visibility
+        setCommentVisibility(updatedVisibility);
     };
 
     useEffect(() => {
@@ -328,12 +331,20 @@ const App = () => {
                             {comments.map((comment, index) => (
                                 <div className="text-white bg-gray-700 p-2 rounded mt-1" key={index}>
                                     <div className="flex items-center text-gray-400 text-sm">
-                                        <span>by {comment.author}</span>
-                                        {comment.pinned && <i className="fas fa-thumbtack text-yellow-500 ml-2"></i>}
+                                        <button className="ml-2 text-blue-500" onClick={() => toggleCommentVisibility(index)}>
+                                            {commentVisibility[index] ? '[ - ]' : '[ + ]'}
+                                        </button><span>by {comment.author}</span>
+
                                     </div>
-                                    <span className="text-gray-400"><i className="fas fa-arrow-up"></i> {comment.ups} upvotes</span>
-                                    <div>{renderFormattedText(comment.body)}</div>
-                                    {comment.imageUrl && <img src={comment.imageUrl} alt="Comment embedded content" className="mt-2 rounded" height="35%" width="35%" />}
+                                {commentVisibility[index] ? (
+                                    <div>
+                                        <span className="text-gray-400"><i className="fas fa-arrow-up"></i> {comment.ups} upvotes</span>
+                                        <div>{renderFormattedText(comment.body)}</div>
+                                        {comment.media_metadata && comment.media_metadata.length > 0 && (
+                                            <img src={comment.media_metadata[0].s.u} alt="Comment embedded content" className="mt-2 rounded" height="35%" width="35%" />
+                                        )}
+                                    </div> 
+                                ) : null}
                                 </div>
                             ))}
                             <button className="mt-4 p-2 bg-gray-700 text-white rounded" onClick={() => setSelectedPost(null)}>Back to Posts</button>
