@@ -268,7 +268,7 @@ const App = () => {
                         <span className="text-gray-400"><i className="fas fa-arrow-up"></i> {comment.ups} upvotes</span>
                         <div>{renderFormattedText(comment.body)}</div>
                         {comment.media_metadata && comment.media_metadata.length > 0 && (
-                            <img src={comment.media_metadata[0].s.u} alt="Comment embedded content" className="mt-2 rounded" />
+                            <img src={comment.media_metadata[0].s.u} alt="Comment embedded content" className="mt-2 rounded" height="30%" width="30%"/>
                         )}
                         {comment.replies && comment.replies.length > 0 && (
                             <div className="ml-4">
