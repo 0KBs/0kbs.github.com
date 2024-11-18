@@ -182,7 +182,7 @@ const App = () => {
         const items = post.gallery_data.items.map(item => {
             const media = post.media_metadata[item.media_id];
             const src = media.s.u.replace(/&amp;/g, '&');
-            return <img key={item.media_id} src={src} alt="Gallery item" className="w-full h-auto rounded mt-2 max-w-full" />;
+            return <img key={item.media_id} src={src} alt="Gallery item" className="w-full h-auto rounded mt-2 max-w-full" height="30%" width="30%" />;
         });
 
         return <div className="gallery">{items}</div>;
@@ -241,7 +241,7 @@ const App = () => {
         } else if (post.url && !post.url.includes("/comments/")) {
             const isRedditUrl = post.url.includes("reddit.com") || post.url.includes("redd.it");
             return isRedditUrl ? (
-                <img src={post.url} alt="Post content" className="mt-2 rounded max-w-full" />
+                <img src={post.url} alt="Post content" className="mt-2 rounded max-w-full" height="30%" width="30%" />
             ) : (
                 <a href={post.url} className="text-blue-500 underline mt-2 block">{post.url}</a>
             );
@@ -268,7 +268,7 @@ const App = () => {
                         <span className="text-gray-400"><i className="fas fa-arrow-up"></i> {comment.ups} upvotes</span>
                         <div>{renderFormattedText(comment.body)}</div>
                         {comment.media_metadata && comment.media_metadata.length > 0 && (
-                            <img src={comment.media_metadata[0].s.u} alt="Comment embedded content" className="mt-2 rounded" height="30%" width="30%"/>
+                            <img src={comment.media_metadata[0].s.u} alt="Comment embedded content" className="mt-2 rounded" height="30%" width="30%" />
                         )}
                         {comment.replies && comment.replies.length > 0 && (
                             <div className="ml-4">
