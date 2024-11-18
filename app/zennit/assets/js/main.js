@@ -198,7 +198,7 @@ const App = () => {
 
         const previewRedditRegex = /(https?:\/\/preview\.redd\.it\/[^\s]+)/g;
         formattedText = formattedText.replace(previewRedditRegex, (match) => {
-            return `<img src="${match}" alt="Comment embedded content" class="mt-2 rounded" />`;
+            return `<img src="${match}" alt="Comment embedded content" class="mt-2 rounded" height="30%" width="30%" />`;
         });
     
         const inlineRegex = [
