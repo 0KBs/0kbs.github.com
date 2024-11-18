@@ -58,7 +58,12 @@ const App = () => {
         fetch(`https://www.reddit.com/${selectedSubreddit}/comments/${postId}.json?sort=${commentSort}`)
             .then(response => response.json())
             .then(data => {
-                const postTitle = data[0].data.children[0].data.title.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase(); // Sanitize title for URL
+                const postTitle = data[0].data.children[0].data.title
+                    .replace(/[^a-zA-Z0-9\s-]/g, '') // Remove non-alphanumeric characters except spaces and hyphens
+                    .trim()
+                    .replace(/\s+/g, '-') // Replace spaces with hyphens
+                    .toLowerCase(); // Convert to lowercase
+    
                 const fetchedComments = data[1].data.children.map(child => {
                     const commentData = {
                         author: child.data.author,
@@ -78,7 +83,10 @@ const App = () => {
                     // Modify the media_metadata URLs to include the post title
                     if (commentData.media_metadata && commentData.media_metadata.length > 0) {
                         commentData.media_metadata.forEach(media => {
-                            media.s.u = media.s.u.replace(/redd\.it\/(.*?)(\.jpeg|\.jpg|\.png)/, `redd.it/${postTitle}$1$2`);
+                            // Construct the new URL with the post title
+                            const originalUrl = media.s.u.replace(/&amp;/g, '&'); // Fix any HTML entities
+                            const imageId = originalUrl.split('/').pop(); // Get the image ID (e.g., dfjklbd0e21e1.jpeg)
+                            media.s.u = `https://preview.redd.it/${postTitle}-${imageId}`; // Construct the new URL
                         });
                     }
     
