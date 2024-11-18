@@ -58,12 +58,7 @@ const App = () => {
         fetch(`https://www.reddit.com/${selectedSubreddit}/comments/${postId}.json?sort=${commentSort}`)
             .then(response => response.json())
             .then(data => {
-                const postTitle = data[0].data.children[0].data.title
-                    .replace(/[^a-zA-Z0-9\s-]/g, '') // Remove non-alphanumeric characters except spaces and hyphens
-                    .trim()
-                    .replace(/\s+/g, '-') // Replace spaces with hyphens
-                    .toLowerCase(); // Convert to lowercase
-    
+                const postTitle = data[0].data.children[0].data.title.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
                 const fetchedComments = data[1].data.children.map(child => {
                     const commentData = {
                         author: child.data.author,
@@ -80,26 +75,22 @@ const App = () => {
                         })) : []
                     };
     
-                    // Modify the media_metadata URLs to include the post title
                     if (commentData.media_metadata && commentData.media_metadata.length > 0) {
                         commentData.media_metadata.forEach(media => {
-                            // Construct the new URL with the post title
-                            const originalUrl = media.s.u.replace(/&amp;/g, '&'); // Fix any HTML entities
-                            const imageId = originalUrl.split('/').pop(); // Get the image ID (e.g., dfjklbd0e21e1.jpeg)
-                            media.s.u = `https://preview.redd.it/${postTitle}-${imageId}`; // Construct the new URL
+                            media.s.u = media.s.u.replace(/redd\.it\/(.*?)(\.jpeg|\.jpg|\.png)/, `redd.it/${postTitle}$1$2`);
                         });
                     }
     
                     return { ...commentData, isVisible: true };
                 });
                 setComments(fetchedComments);
-                setCommentVisibility(new Array(fetchedComments.length).fill(true)); // All comments start as visible
+                setCommentVisibility(new Array(fetchedComments.length).fill(true));
             });
     };
 
     const toggleCommentVisibility = (index) => {
         const updatedVisibility = [...commentVisibility];
-        updatedVisibility[index] = !updatedVisibility[index]; // Toggle the visibility
+        updatedVisibility[index] = !updatedVisibility[index];
         setCommentVisibility(updatedVisibility);
     };
 
@@ -199,11 +190,17 @@ const App = () => {
 
     const renderFormattedText = (text) => {
         const sanitizedText = text.replace(/\\/g, '');
+        const cleanText = sanitizedText.replace(/\n\n+/g, '\n');
         const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
-        let formattedText = sanitizedText.replace(linkRegex, (match, p1, p2) => {
+        let formattedText = cleanText.replace(linkRegex, (match, p1, p2) => {
             return `<a href="${p2}" class="text-blue-500 underline">${p1}</a>`;
         });
-      
+
+        const previewRedditRegex = /(https?:\/\/preview\.redd\.it\/[^\s]+)/g;
+        formattedText = formattedText.replace(previewRedditRegex, (match) => {
+            return `<img src="${match}" alt="Comment embedded content" class="mt-2 rounded" />`;
+        });
+    
         const inlineRegex = [
             { regex: /~~(.*?)~~/g, tag: 'del' },
             { regex: /\^(\S+)/g, tag: 'sup' },
@@ -227,12 +224,13 @@ const App = () => {
                 return `<${tag} class="${className || ''}">${p2}</${tag}>`;
             });
         });
-
+    
         const codeBlockRegex = /((?:^|\n)(?: {4}.*\n)+)/g;
         formattedText = formattedText.replace(codeBlockRegex, (match, p1) => {
             const codeContent = p1.replace(/^ {4}/gm, '');
             return `<pre>${codeContent}</pre>`;
         });
+        
         formattedText = formattedText.replace(/\n/g, '<br/>');
         return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
     };
