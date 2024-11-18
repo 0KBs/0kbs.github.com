@@ -58,15 +58,30 @@ const App = () => {
         fetch(`https://www.reddit.com/${selectedSubreddit}/comments/${postId}.json?sort=${commentSort}`)
             .then(response => response.json())
             .then(data => {
+                const postTitle = data[0].data.children[0].data.title.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase(); // Sanitize title for URL
                 const fetchedComments = data[1].data.children.map(child => {
                     const commentData = {
                         author: child.data.author,
                         body: child.data.body,
                         media_metadata: child.data.media_metadata,
                         pinned: child.data.stickied,
-                        ups: child.data.ups - child.data.downs
+                        ups: child.data.ups - child.data.downs,
+                        replies: child.data.replies ? child.data.replies.data.children.map(reply => ({
+                            author: reply.data.author,
+                            body: reply.data.body,
+                            media_metadata: reply.data.media_metadata,
+                            pinned: reply.data.stickied,
+                            ups: reply.data.ups - reply.data.downs,
+                        })) : []
                     };
-                    // Initialize visibility state for each comment
+    
+                    // Modify the media_metadata URLs to include the post title
+                    if (commentData.media_metadata && commentData.media_metadata.length > 0) {
+                        commentData.media_metadata.forEach(media => {
+                            media.s.u = media.s.u.replace(/redd\.it\/(.*?)(\.jpeg|\.jpg|\.png)/, `redd.it/${postTitle}$1$2`);
+                        });
+                    }
+    
                     return { ...commentData, isVisible: true };
                 });
                 setComments(fetchedComments);
@@ -227,7 +242,41 @@ const App = () => {
         }
         return null;
     };
+    const Comment = ({ comment }) => {
+        const [isVisible, setIsVisible] = useState(true);
+        
+        const toggleVisibility = () => {
+            setIsVisible(!isVisible);
+        };
 
+        return (
+            <div className="text-white bg-gray-700 p-2 rounded mt-1">
+                <div className="flex items-center text-gray-400 text-sm">
+                    <button className="ml-2 text-blue-500" onClick={toggleVisibility}>
+                        {isVisible ? '[ - ]' : '[ + ]'}
+                    </button>
+                    <span>by {comment.author}</span>
+                </div>
+                {isVisible && (
+                    <div>
+                        <span className="text-gray-400"><i className="fas fa-arrow-up"></i> {comment.ups} upvotes</span>
+                        <div>{renderFormattedText(comment.body)}</div>
+                        {comment.media_metadata && comment.media_metadata.length > 0 && (
+                            <img src={comment.media_metadata[0].s.u} alt="Comment embedded content" className="mt-2 rounded" />
+                        )}
+                        {comment.replies && comment.replies.length > 0 && (
+                            <div className="ml-4">
+                                {comment.replies.map((reply, index) => (
+                                    <Comment key={index} comment={reply} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    };
+    
     return (
         <div className="flex h-screen">
             <div ref={sidebarRef} className={`fixed inset-y-0 left-0 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out w-64 bg-gray-900 p-4 z-50`}>
@@ -328,28 +377,12 @@ const App = () => {
                                 </div>
                             </div>
                             <div className="text-gray-400 text-sm mt-1">Comments</div>
-                            {comments.map((comment, index) => (
-                                <div className="text-white bg-gray-700 p-2 rounded mt-1" key={index}>
-                                    <div className="flex items-center text-gray-400 text-sm">
-                                        <button className="ml-2 text-blue-500" onClick={() => toggleCommentVisibility(index)}>
-                                            {commentVisibility[index] ? '[ - ]' : '[ + ]'} 
-                                        </button><span>by {comment.author}</span>
-
-                                    </div>
-                                {commentVisibility[index] ? (
-                                    <div>
-                                        <span className="text-gray-400"><i className="fas fa-arrow-up"></i> {comment.ups} upvotes</span>
-                                        <div>{renderFormattedText(comment.body)}</div>
-                                        {comment.media_metadata && comment.media_metadata.length > 0 && (
-                                            <img src={comment.media_metadata[0].s.u} alt="Comment embedded content" className="mt-2 rounded" height="35%" width="35%" />
-                                        )}
-                                    </div> 
-                                ) : null}
-                                </div>
-                            ))}
-                            <button className="mt-4 p-2 bg-gray-700 text-white rounded" onClick={() => setSelectedPost(null)}>Back to Posts</button>
-                        </div>
-                    ) : (
+                        {comments.map((comment, index) => (
+                            <Comment key={index} comment={comment} />
+                        ))}
+                        <button className="mt-4 p-2 bg-gray-700 text-white rounded" onClick={() => setSelectedPost(null)}>Back to Posts</button>
+                    </div>
+                ) : (
                         posts.map((post, index) => (
                             <div className="mb-4" key={index}>
                                 <div className="text-white bg-gray-700 p-2 rounded mt-1 flex justify-between items-center">
