@@ -332,7 +332,7 @@ const App = () => {
                                 <div className="text-white bg-gray-700 p-2 rounded mt-1" key={index}>
                                     <div className="flex items-center text-gray-400 text-sm">
                                         <button className="ml-2 text-blue-500" onClick={() => toggleCommentVisibility(index)}>
-                                            {commentVisibility[index] ? '[ - ]' : '[ + ]'}
+                                            {commentVisibility[index] ? '[ - ]' : '[ + ]'} 
                                         </button><span>by {comment.author}</span>
 
                                     </div>
