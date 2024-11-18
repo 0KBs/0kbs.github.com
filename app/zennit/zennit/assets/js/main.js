@@ -73,48 +73,17 @@ const App = () => {
                             ups: reply.data.ups - reply.data.downs,
                         })) : []
                     };
-                    return { ...commentData, isVisible: true }; // Initialize visibility state for each comment
+                    return { ...commentData, isVisible: true };
                 });
-                console.log(data);
                 setComments(fetchedComments);
                 setCommentVisibility(new Array(fetchedComments.length).fill(true)); // All comments start as visible
             });
-            
     };
 
     const toggleCommentVisibility = (index) => {
-        const updatedComments = [...comments];
-        updatedComments[index].isVisible = !updatedComments[index].isVisible; // Toggle the visibility
-        setComments(updatedComments);
-    };
-
-    const Comment = ({ comment, toggleVisibility }) => {
-        return (
-            <div className="text-white bg-gray-700 p-2 rounded mt-1">
-                <div className="flex items-center text-gray-400 text-sm">
-                    <button className="ml-2 text-blue-500" onClick={toggleVisibility}>
-                        {comment.isVisible ? '[ - ]' : '[ + ]'}
-                    </button>
-                    <span>by {comment.author}</span>
-                </div>
-                {comment.isVisible && (
-                    <div>
-                        <span className="text-gray-400"><i className="fas fa-arrow-up"></i> {comment.ups} upvotes</span>
-                        <div>{renderFormattedText(comment.body)}</div> {/* Render the body of the comment */}
-                        {comment.media_metadata && comment.media_metadata.length > 0 && (
-                            <img src={comment.media_metadata[0].s.u} alt="Comment embedded content" className="mt-2 rounded" />
-                        )}
-                        {comment.replies.length > 0 && (
-                            <div className="ml-4">
-                                {comment.replies.map((reply, index) => (
-                                    <Comment key={index} comment={reply} toggleVisibility={() => {}} />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        );
+        const updatedVisibility = [...commentVisibility];
+        updatedVisibility[index] = !updatedVisibility[index]; // Toggle the visibility
+        setCommentVisibility(updatedVisibility);
     };
 
     useEffect(() => {
@@ -264,7 +233,45 @@ const App = () => {
         }
         return null;
     };
+    const Comment = ({ comment }) => {
+    const [isVisible, setIsVisible] = useState(true);
+    
+    const toggleVisibility = () => {
+        setIsVisible(!isVisible);
+    };
 
+    return (
+        <div className="text-white bg-gray-700 p-2 rounded mt-1">
+            <div className="flex items-center text-gray-400 text-sm">
+                <button className="ml-2 text-blue-500" onClick={toggleVisibility}>
+                    {isVisible ? '[ - ]' : '[ + ]'}
+                </button>
+                <span>by {comment.author}</span>
+            </div>
+            {isVisible && (
+                <div>
+                    <span className="text-gray-400"><i className="fas fa-arrow-up"></i> {comment.ups} upvotes</span>
+                    <div>{renderFormattedText(comment.body)}</div>
+                    {comment.media_metadata && Object.keys(comment.media_metadata).length > 0 && (
+                        <img 
+                            src={comment.media_metadata[Object.keys(comment.media_metadata)[0]].s.u} 
+                            alt="Comment embedded content" 
+                            className="mt-2 rounded" 
+                        />
+                    )}
+                    {comment.replies && comment.replies.length > 0 && (
+                        <div className="ml-4">
+                            {comment.replies.map((reply, index) => (
+                                <Comment key={index} comment={reply} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+    
     return (
         <div className="flex h-screen">
             <div ref={sidebarRef} className={`fixed inset-y-0 left-0 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out w-64 bg-gray-900 p-4 z-50`}>
@@ -365,16 +372,12 @@ const App = () => {
                                 </div>
                             </div>
                             <div className="text-gray-400 text-sm mt-1">Comments</div>
-                            {comments.map((comment, index) => (
-                                <Comment
-                                    key={index}
-                                    comment={comment}
-                                    toggleVisibility={() => toggleCommentVisibility(index)}
-                                />
-                            ))}
-                            <button className="mt-4 p-2 bg-gray-700 text-white rounded" onClick={() => setSelectedPost(null)}>Back to Posts</button>
-                        </div>
-                    ) : (
+                        {comments.map((comment, index) => (
+                            <Comment key={index} comment={comment} />
+                        ))}
+                        <button className="mt-4 p-2 bg-gray-700 text-white rounded" onClick={() => setSelectedPost(null)}>Back to Posts</button>
+                    </div>
+                ) : (
                         posts.map((post, index) => (
                             <div className="mb-4" key={index}>
                                 <div className="text-white bg-gray-700 p-2 rounded mt-1 flex justify-between items-center">
