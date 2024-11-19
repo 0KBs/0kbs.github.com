@@ -37,7 +37,7 @@ const App = () => {
 
     const fetchPosts = (page = 1) => {
         setLoadingPosts(true);
-        fetch(`https://www.reddit.com/${selectedSubreddit}/${sort}.json?count=${(page - 1) * 25}&limit=25`)
+        fetch(`https://www.reddit.com/${selectedSubreddit}/${sort}.json?count=${(page - 1) * 25}`)
             .then(response => {
                 if (!response.ok) {
                     setContentBlockerDetected(true);
@@ -59,10 +59,12 @@ const App = () => {
                     pinned: child.data.stickied,
                     ups: child.data.ups - child.data.downs
                 }));
-                setPosts(prevPosts => [...prevPosts, ...fetchedPosts]);
+
+                setPosts(prevPosts => [...prevPosts, ...fetchedPosts]); // Append only unique posts
                 setHasMorePosts(fetchedPosts.length > 0);
                 setContentBlockerDetected(false);
             })
+        
             .catch(error => {
                 console.error('Fetch error:', error);
                 setContentBlockerDetected(true);
@@ -171,8 +173,10 @@ const App = () => {
     }, [hasMorePosts]);
 
     useEffect(() => {
+        setPosts([]);
         fetchPosts(currentPage);
-    }, [selectedSubreddit, sort, currentPage]);
+    }, [selectedSubreddit, sort]);
+
 
     useEffect(() => {
         localStorage.setItem('subreddits', JSON.stringify(subreddits));
