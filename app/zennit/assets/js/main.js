@@ -21,9 +21,12 @@ const App = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const sidebarRef = useRef(null);
     const [commentVisibility, setCommentVisibility] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [hasMorePosts, setHasMorePosts] = useState(true);
+    const [hasMoreComments, setHasMoreComments] = useState(true);
 
-    const fetchPosts = () => {
-        fetch(`https://www.reddit.com/${selectedSubreddit}/${sort}.json`)
+    const fetchPosts = (page = 1) => {
+        fetch(`https://www.reddit.com/${selectedSubreddit}/${sort}.json?count=${(page - 1) * 25}&limit=25`)
             .then(response => {
                 if (!response.ok) {
                     setContentBlockerDetected(true);
@@ -45,7 +48,8 @@ const App = () => {
                     pinned: child.data.stickied,
                     ups: child.data.ups - child.data.downs
                 }));
-                setPosts(fetchedPosts);
+                setPosts(prevPosts => [...prevPosts, ...fetchedPosts]);
+                setHasMorePosts(fetchedPosts.length > 0);
                 setContentBlockerDetected(false);
             })
             .catch(error => {
@@ -93,6 +97,21 @@ const App = () => {
         updatedVisibility[index] = !updatedVisibility[index];
         setCommentVisibility(updatedVisibility);
     };
+
+    useEffect(() => {
+        const handleScroll = () => {
+            if (window.innerHeight + document.documentElement.scrollTop !== document.documentElement.offsetHeight || !hasMorePosts) return;
+            setCurrentPage(prevPage => prevPage + 1);
+        };
+    
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [hasMorePosts]);
+
+    useEffect(() => {
+        fetchPosts(currentPage);
+    }, [selectedSubreddit, sort, currentPage]);
+
 
     useEffect(() => {
         fetchPosts();
