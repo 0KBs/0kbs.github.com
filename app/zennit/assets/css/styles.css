@@ -33,3 +33,9 @@ pre {
     font-size: 90%;
     overflow-x: auto;
 }
+.inactive {
+    color: #6c7f9c;
+}
+.active {
+    color: white;
+}
