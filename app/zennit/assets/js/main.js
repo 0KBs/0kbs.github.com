@@ -33,6 +33,8 @@ const App = () => {
     const [viewingSaved, setViewingSaved] = useState(false);
     const [postToDelete, setPostToDelete] = useState(null);
     const [showDeletePopup, setShowDeletePopup] = useState(false);
+    const [editMode, setEditMode] = useState(false); // New state for edit mode
+
     
 
     const fetchPosts = (page = 0) => {
@@ -147,15 +149,26 @@ const App = () => {
         setShowDeletePopup(false);
         setPostToDelete(null);
     };
-
+    
     const renderSavedPosts = () => {
-        
         return savedPosts.map((post, index) => (
-            
-            <div className="mb-4" key={index} onContextMenu={(e) => handleSavedPostRightClick(e, post)}>
-                <div className="text-white bg-gray-700 p-2 rounded mt-1 flex justify-between items-center" onClick={() => viewPost(post.id)}>
-                    <span>{post.title}</span>
-                    <button className="ml-4 p-2 bg-gray-700 text-white rounded">View Post</button>
+            <div className="mb-4" key={index}>
+                <div className="text-white bg-gray-700 p-2 rounded mt-1 flex justify-between items-center">
+                    <div className="flex items-center" onClick={() => viewPost(post.id)}>
+                        <span>{post.title}</span>
+                        <button className="ml-4 p-2 bg-gray-700 text-white rounded">View Post</button>
+                    </div>
+                    {editMode && (
+                        <button 
+                            className="text-red-500 ml-2" 
+                            onClick={() => {
+                                setPostToDelete(post);
+                                setShowDeletePopup(true);
+                            }}
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                    )}
                 </div>
             </div>
         ));
@@ -212,6 +225,31 @@ const App = () => {
         if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
             setSidebarOpen(false);
         }
+    };
+
+    const renderSubreddits = () => {
+        return subreddits.map((subreddit, index) => (
+            <div className="flex items-center mt-2 cursor-pointer" key={index}>
+                <div 
+                    className="ml-2 text-white" 
+                    onClick={() => setSelectedSubreddit(subreddit.name)}
+                    onContextMenu={(e) => handleRightClick(e, subreddit.name)}
+                >
+                    {subreddit.name}
+                </div>
+                {editMode && (
+                    <button 
+                        className="text-red-500 ml-2" 
+                        onClick={() => {
+                            setSubredditToDelete(subreddit.name);
+                            setShowPopup(true);
+                        }}
+                    >
+                        <i className="fas fa-times"></i> {/* Red X icon */}
+                    </button>
+                )}
+            </div>
+        ));
     };
 
     useEffect(() => {
@@ -382,16 +420,12 @@ const App = () => {
                 </div>
                 <div className="mb-4">
                     <h2 className="text-gray-400">Subreddits</h2>
-                    {subreddits.map((subreddit, index) => (
-                        <div 
-                            className="flex items-center mt-2 cursor-pointer" 
-                            key={index} 
-                            onClick={() => setSelectedSubreddit(subreddit.name)}
-                            onContextMenu={(e) => handleRightClick(e, subreddit.name)}
-                        >
-                            <div className="ml-2 text-white">{subreddit.name}</div>
-                        </div>
-                    ))}
+                    {renderSubreddits()}
+                </div>
+                <div className="mt-4">
+                    <button className="mt-2 w-full p-2 bg-gray-700 text-white rounded" onClick={() => setEditMode(!editMode)}>
+                        {editMode ? 'Done Editing' : 'Edit Subreddits'}
+                    </button>
                 </div>
                 <div className="mt-4">
                     <input
@@ -449,7 +483,10 @@ const App = () => {
                     {viewingSaved ? (
                         <div>
                             <h2 className="text-white text-xl mb-4">Saved Posts</h2>
+                            <div className="text-gray-400 text-sm mb-4">
+                            <h3 className="text-gray-400 text-sm mt-1" onClick={() => setEditMode(!editMode)}>Edit saved posts</h3>
                             {renderSavedPosts()}
+                            </div>
                         </div>
                     ) : selectedPost ? (
                         <div>
@@ -539,7 +576,7 @@ const App = () => {
             )}
             {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage('')} />}
         </div>
-    );
-};
+    )
+}
 
 ReactDOM.render(<App />, document.getElementById('root'));
