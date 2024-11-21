@@ -35,7 +35,7 @@ const App = () => {
     const [showDeletePopup, setShowDeletePopup] = useState(false);
     
 
-    const fetchPosts = (page = 1) => {
+    const fetchPosts = (page = 0) => {
         setLoadingPosts(true);
         fetch(`https://www.reddit.com/${selectedSubreddit}/${sort}.json?count=${(page - 1) * 25}`)
             .then(response => {
@@ -60,8 +60,7 @@ const App = () => {
                     ups: child.data.ups - child.data.downs
                 }));
 
-                setPosts(prevPosts => [...prevPosts, ...fetchedPosts]); // Append only unique posts
-                setHasMorePosts(fetchedPosts.length > 0);
+                setPosts(prevPosts => [...fetchedPosts]);
                 setContentBlockerDetected(false);
             })
         
@@ -162,15 +161,6 @@ const App = () => {
         ));
     };
 
-    useEffect(() => {
-        const handleScroll = () => {
-            if (window.innerHeight + document.documentElement.scrollTop !== document.documentElement.offsetHeight || !hasMorePosts) return;
-            setCurrentPage(prevPage => prevPage + 1);
-        };
-    
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, [hasMorePosts]);
 
     useEffect(() => {
         setPosts([]);
