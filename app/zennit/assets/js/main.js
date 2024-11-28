@@ -1,5 +1,11 @@
 const { useState, useEffect, useRef } = React;
 
+const CLIENT_ID = 'Y3ydOPwb0Ghvq-vT03gOHg'; // Replace with your Reddit app's client ID
+const CLIENT_SECRET = 'SvB_BdTL5YbtTaL7xG2PTqR2hc9skg'; // Replace with your Reddit app's client secret
+const REDIRECT_URI = 'https://zen.0kb.org'; // Replace with your redirect URI
+const AUTH_URL = `https://www.reddit.com/api/v1/authorize?client_id=${CLIENT_ID}&response_type=code&state=random_string&redirect_uri=${REDIRECT_URI}&duration=permanent&scope=read`;
+
+
 const App = () => {
     const [contentBlockerDetected, setContentBlockerDetected] = useState(false);
     const [loadingPosts, setLoadingPosts] = useState(false);
@@ -35,8 +41,117 @@ const App = () => {
     const [showDeletePopup, setShowDeletePopup] = useState(false);
     const [editMode, setEditMode] = useState(false); // New state for edit mode
 
-    
+    const loginWithReddit = () => {
 
+        window.location.href = AUTH_URL;
+
+    };
+
+
+    useEffect(() => {
+
+        const urlParams = new URLSearchParams(window.location.search);
+
+        const code = urlParams.get('code');
+
+
+        if (code) {
+
+            // Exchange code for access token
+
+            fetch('https://www.reddit.com/api/v1/access_token', {
+
+                method: 'POST',
+
+                headers: {
+
+                    'Authorization': 'Basic ' + btoa(`${CLIENT_ID}:${CLIENT_SECRET}`),
+
+                    'Content-Type': 'application/x-www-form-urlencoded'
+
+                },
+
+                body: `grant_type=authorization_code&code=${code}&redirect_uri=${REDIRECT_URI}`
+
+            })
+
+            .then(response => response.json())
+
+            .then(data => {
+
+                if (data.access_token) {
+
+                    setAccessToken(data.access_token);
+
+                    // Save the access token to local storage
+
+                    localStorage.setItem('reddit_access_token', data.access_token);
+
+                } else {
+
+                    console.error('Error fetching access token:', data);
+
+                }
+
+            })
+
+            .catch(error => {
+
+                console.error('Fetch error:', error);
+
+            });
+
+        }
+
+    }, []);
+
+
+    const fetchUserData = () => {
+
+        const token = localStorage.getItem('reddit_access_token');
+
+        if (token) {
+
+            fetch('https://oauth.reddit.com/api/v1/me', {
+
+                headers: {
+
+                    'Authorization': `Bearer ${token}`,
+
+                    'User -Agent': 'YOUR_USER_AGENT' // Replace with your user agent
+
+                }
+
+            })
+
+            .then(response => response.json())
+
+            .then(data => {
+
+                console.log('User  data:', data);
+
+            })
+
+            .catch(error => {
+
+                console.error('Error fetching user data:', error);
+
+            });
+
+        }
+
+    };
+
+
+    useEffect(() => {
+
+        if (accessToken) {
+
+            fetchUserData();
+
+        }
+
+    }, [accessToken]);
     const fetchPosts = (page = 0) => {
         setLoadingPosts(true);
         fetch(`https://www.reddit.com/${selectedSubreddit}/${sort}.json?count=${(page - 1) * 25}`)
@@ -312,21 +427,33 @@ const App = () => {
     };
 
     const renderFormattedText = (text) => {
-        const sanitizedText = text.replace(/\\/g, '');
-        const cleanText = sanitizedText.replace(/\n\n+/g, '\n');
+        // Check if text is valid
+        if (!text || typeof text !== 'string') {
+            return null;
+        }
+    
+        let formattedText = text;
+    
+        // Sanitize text
+        formattedText = formattedText.replace(/\\/g, '');
+        formattedText = formattedText.replace(/\n\n+/g, '\n');
+    
+        // Handle links
         const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
-        let formattedText = cleanText.replace(linkRegex, (match, p1, p2) => {
+        formattedText = formattedText.replace(linkRegex, (match, p1, p2) => {
             return `<a href="${p2}" class="text-blue-500 underline">${p1}</a>`;
         });
-
+    
+        // Handle preview Reddit images
         const previewRedditRegex = /(https?:\/\/preview\.redd\.it\/[^\s]+)/g;
         formattedText = formattedText.replace(previewRedditRegex, (match) => {
             return `<img src="${match}" alt="Comment embedded content" class="mt-2 rounded" height="30%" width="30%" />`;
         });
     
+        // Handle inline formatting
         const inlineRegex = [
             { regex: /~~(.*?)~~/g, tag: 'del' },
-            { regex: /\^(\S+)/g, tag: 'sup' },
+            { regex: /\^(\S+)/g, tag:'sup' },
             { regex: /`(.*?)`/g, tag: 'code' }
         ];
     
@@ -336,9 +463,10 @@ const App = () => {
             });
         });
     
+        // Handle markdown formatting
         const markdownRegex = [
-            { regex: /(\*\*\*|___)(.*?)\1/g, tag: 'strong', className: 'italic' },
-            { regex: /(\*\*|__)(.*?)\1/g, tag: 'strong' },
+            { regex: /(\*\*\*|___)(.*?)\1/g, tag:'strong', className: 'italic' },
+            { regex: /(\*\*|__)(.*?)\1/g, tag:'strong' },
             { regex: /(\*|_)(.*?)\1/g, tag: 'em' }
         ];
     
@@ -348,13 +476,16 @@ const App = () => {
             });
         });
     
+        // Handle code blocks
         const codeBlockRegex = /((?:^|\n)(?: {4}.*\n)+)/g;
         formattedText = formattedText.replace(codeBlockRegex, (match, p1) => {
             const codeContent = p1.replace(/^ {4}/gm, '');
             return `<pre>${codeContent}</pre>`;
         });
-        
+    
+        // Replace newlines with <br/>
         formattedText = formattedText.replace(/\n/g, '<br/>');
+    
         return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
     };
 
