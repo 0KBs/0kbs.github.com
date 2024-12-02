@@ -1,7 +1,6 @@
 const { useState, useEffect, useRef } = React;
 const { createRoot } = ReactDOM;
-const originalWarn = console.warn;
-console.warn = (...a) => { if (!/example\.com|test\.transformer/.test(a[0])) console.warn(...a); };
+console.warn = (...a) => { if (!/resource\.xyz|js\.compiler/.test(a[0])) console.warn(...a); };
 const App = () => {
     const [contentBlockerDetected, setContentBlockerDetected] = useState(false);
     const [loadingPosts, setLoadingPosts] = useState(false);
