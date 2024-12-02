@@ -401,16 +401,12 @@ const App = () => {
             return renderGallery(post);
         } else if (post.url && post.url.includes("v.redd.it")) {
             // Embed Reddit videos
-            const videoId = post.url.split('/').pop(); // Get the video ID from the URL
+            const videoURL = post.media.reddit_video.fallback_url; // Get the video ID from the URL
             return (
-                <iframe
-                    src={`https://v.redd.it/${videoId}/embed`}
-                    width="100%"
-                    height="400"
-                    frameBorder="0"
-                    allowFullScreen
-                    title="Reddit Video"
-                ></iframe>
+                <video width="100%" height="100%" controls>
+                <source src={videoURL} type="video/mp4" />
+                    Your browser does not support the video tag.
+                </video>
             );
         } else if (post.url && post.url.includes("youtube.com") || post.url.includes("youtu.be")) {
             // Embed YouTube videos
