@@ -1,16 +1,18 @@
 const { useState, useEffect, useRef } = React;
-
+const { createRoot } = ReactDOM;
+const originalWarn = console.warn;
+console.warn = (...a) => { if (!/example\.com|test\.transformer/.test(a[0])) console.warn(...a); };
 const App = () => {
     const [contentBlockerDetected, setContentBlockerDetected] = useState(false);
     const [loadingPosts, setLoadingPosts] = useState(false);
     const [loadingComments, setLoadingComments] = useState(false);
     const [subreddits, setSubreddits] = useState(() => {
         const savedSubreddits = localStorage.getItem('subreddits');
-        return savedSubreddits ? JSON.parse(savedSubreddits) : [{ name: 'r/technology' }];
+        return savedSubreddits ? JSON.parse(savedSubreddits) : [{ name: 'r/Zennit' }];
     });
     const [selectedSubreddit, setSelectedSubreddit] = useState(() => {
         const savedSubreddit = localStorage.getItem('selectedSubreddit');
-        return savedSubreddit ? savedSubreddit : 'r/technology';
+        return savedSubreddit ? savedSubreddit : 'r/Zennit';
     });
     const [posts, setPosts] = useState([]);
     const [selectedPost, setSelectedPost] = useState(null);
@@ -34,11 +36,20 @@ const App = () => {
     const [postToDelete, setPostToDelete] = useState(null);
     const [showDeletePopup, setShowDeletePopup] = useState(false);
     const [editMode, setEditMode] = useState(false);
-    const [touchStartX, setTouchStartX] = useState(null);
+
+    
 
     const fetchPosts = (page = 0) => {
         setLoadingPosts(true);
-        fetch(`https://www.reddit.com/${selectedSubreddit}/${sort}.json?count=${(page - 1) * 25}`)
+        let fetchUrl;
+        if (selectedSubreddit.startsWith('u/')) {
+            const username = selectedSubreddit.substring(2);
+            fetchUrl = `https://www.reddit.com/user/${username}/submitted/${sort}.json?count=${(page - 1) * 25}`;
+        } else {
+            fetchUrl = `https://www.reddit.com/${selectedSubreddit}/${sort}.json?count=${(page - 1) * 25}`;
+        }
+    
+        fetch(fetchUrl)
             .then(response => {
                 if (!response.ok) {
                     setContentBlockerDetected(true);
@@ -60,7 +71,7 @@ const App = () => {
                     pinned: child.data.stickied,
                     ups: child.data.ups - child.data.downs
                 }));
-
+    
                 setPosts(prevPosts => [...fetchedPosts]);
                 setContentBlockerDetected(false);
             })
@@ -75,13 +86,15 @@ const App = () => {
 
     const fetchComments = (postId) => {
         setLoadingComments(true);
-        
-        // Find the post to get its subreddit_name_prefixed
         const post = posts.find(p => p.id === postId) || savedPosts.find(p => p.id === postId);
-        const subredditToUse = post ? post.subreddit_name_prefixed : selectedSubreddit;
-    
+        const subredditToUse = post.subreddit;
         fetch(`https://www.reddit.com/${subredditToUse}/comments/${postId}.json?sort=${commentSort}`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
                 const postTitle = data[0].data.children[0].data.title.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
                 const fetchedComments = data[1].data.children.map(child => {
@@ -142,19 +155,18 @@ const App = () => {
     };
 
     const confirmDeletePost = () => {
-        const updatedSavedPosts = savedPosts.filter(p => p.id !== postToDelete.id);
-        setSavedPosts(updatedSavedPosts);
-        localStorage.setItem('savedPosts', JSON.stringify(updatedSavedPosts));
+        setSavedPosts(savedPosts.filter(p => p.id !== postToDelete.id));
+        localStorage.setItem('savedPosts', JSON.stringify(savedPosts.filter(p => p.id !== postToDelete.id)));
         setShowDeletePopup(false);
         setPostToDelete(null);
         setToastMessage('Post removed from bookmarks!');
     };
-
+    
     const cancelDeletePost = () => {
         setShowDeletePopup(false);
         setPostToDelete(null);
     };
-
+    
     const renderSavedPosts = () => {
         return savedPosts.map((post, index) => (
             <div className="mb-4" key={index}>
@@ -179,10 +191,12 @@ const App = () => {
         ));
     };
 
+
     useEffect(() => {
         setPosts([]);
         fetchPosts(currentPage);
     }, [selectedSubreddit, sort]);
+
 
     useEffect(() => {
         localStorage.setItem('subreddits', JSON.stringify(subreddits));
@@ -200,8 +214,20 @@ const App = () => {
     };
 
     const addSubreddit = () => {
-        if (newSubreddit && !subreddits.some(sub => sub.name === newSubreddit)) {
-            setSubreddits([...subreddits, { name: newSubreddit }]);
+        if (newSubreddit) {
+            let formattedSubreddit = newSubreddit.trim();
+            if (formattedSubreddit.startsWith('user/') && formattedSubreddit.includes('/m/')) {
+                const multiRedditName = formattedSubreddit.split('/m/')[1];
+                setSubreddits([...subreddits, { name: multiRedditName, original: formattedSubreddit }]);
+            } else if (formattedSubreddit.startsWith('u/') && !formattedSubreddit.includes('/m/')) {
+                setSubreddits([...subreddits, { name: formattedSubreddit }]);
+            } else {
+                if (!formattedSubreddit.startsWith('r/')) {
+                    formattedSubreddit = 'r/' + formattedSubreddit;
+                }
+                setSubreddits([...subreddits, { name: formattedSubreddit }]);
+            }
+    
             setNewSubreddit('');
         }
     };
@@ -213,8 +239,7 @@ const App = () => {
     };
 
     const confirmDelete = () => {
-        const updatedSubreddits = subreddits.filter(sub => sub.name !== subredditToDelete);
-        setSubreddits(updatedSubreddits);
+        setSubreddits(subreddits.filter(sub => sub.name !== subredditToDelete));
         setShowPopup(false);
         setSubredditToDelete(null);
         setToastMessage('Subreddit removed!');
@@ -236,12 +261,14 @@ const App = () => {
             <div className="flex items-center mt-2 cursor-pointer" key={index}>
                 <div 
                     className="ml-2 text-white" 
-                    onClick={() => setSelectedSubreddit(subreddit.name)}
+                    onClick={() => {
+                        const subredditToFetch = subreddit.original ? subreddit.original : subreddit.name;
+                        setSelectedSubreddit(subredditToFetch);
+                        setSidebarOpen(false);}}
                     onContextMenu={(e) => handleRightClick(e, subreddit.name)}
                 >
-                    {subreddit.name}
-
-                    </div>
+                    {subreddit.original ? `m/${subreddit.name}` : subreddit.name}
+                </div>
                 {editMode && (
                     <button 
                         className="text-red-500 ml-2" 
@@ -250,7 +277,7 @@ const App = () => {
                             setShowPopup(true);
                         }}
                     >
-                        <i className="fas fa-times"></i>
+                        <i className="fas fa-times"></i> {/* Red X icon */}
                     </button>
                 )}
             </div>
@@ -289,12 +316,14 @@ const App = () => {
         }
     };
 
+    const [touchStartX, setTouchStartX] = useState(null);
+
     const Toast = ({ message, onClose }) => {
         useEffect(() => {
             const timer = setTimeout(onClose, 3000);
             return () => clearTimeout(timer);
         }, [onClose]);
-
+    
         return (
             <div className="fixed bottom-4 right-4 bg-green-500 text-white p-2 rounded shadow-lg">
                 {message}
@@ -318,10 +347,10 @@ const App = () => {
         if (!text || typeof text !== 'string') {
             return null;
         }
-
-        let formattedText = text
-            .replace(/\\/g, '')
-            .replace(/\n\n+/g, '\n');
+    
+        let formattedText = text;
+        formattedText = formattedText.replace(/\\/g, '');
+        formattedText = formattedText.replace(/\n\n+/g, '\n');
 
         const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
         formattedText = formattedText.replace(linkRegex, (match, p1, p2) => {
@@ -332,39 +361,39 @@ const App = () => {
         formattedText = formattedText.replace(previewRedditRegex, (match) => {
             return `<img src="${match}" alt="Comment embedded content" class="mt-2 rounded" height="30%" width="30%" />`;
         });
-
+    
         const inlineRegex = [
             { regex: /~~(.*?)~~/g, tag: 'del' },
-            { regex: /\^(\S+)/g, tag: 'sup' },
+            { regex: /\^(\S+)/g, tag:'sup' },
             { regex: /`(.*?)`/g, tag: 'code' }
         ];
-
+    
         inlineRegex.forEach(({ regex, tag }) => {
             formattedText = formattedText.replace(regex, (match, p1) => {
                 return `<${tag}>${p1}</${tag}>`;
             });
         });
-
+    
         const markdownRegex = [
-            { regex: /(\*\*\*|___)(.*?)\1/g, tag: 'strong', className: 'italic' },
-            { regex: /(\*\*|__)(.*?)\1/g, tag: 'strong' },
+            { regex: /(\*\*\*|___)(.*?)\1/g, tag:'strong', className: 'italic' },
+            { regex: /(\*\*|__)(.*?)\1/g, tag:'strong' },
             { regex: /(\*|_)(.*?)\1/g, tag: 'em' }
         ];
-
+    
         markdownRegex.forEach(({ regex, tag, className }) => {
             formattedText = formattedText.replace(regex, (match, p1, p2) => {
                 return `<${tag} class="${className || ''}">${p2}</${tag}>`;
             });
         });
-
+    
         const codeBlockRegex = /((?:^|\n)(?: {4}.*\n)+)/g;
         formattedText = formattedText.replace(codeBlockRegex, (match, p1) => {
             const codeContent = p1.replace(/^ {4}/gm, '');
             return `<pre>${codeContent}</pre>`;
         });
-
+    
         formattedText = formattedText.replace(/\n/g, '<br/>');
-
+    
         return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
     };
 
@@ -381,8 +410,7 @@ const App = () => {
         }
         return null;
     };
-
-    const Comment = ({ comment }) => {
+    const Comment = ({ comment, saveComment  }) => {
         const [isVisible, setIsVisible] = useState(true);
         
         const toggleVisibility = () => {
@@ -416,7 +444,7 @@ const App = () => {
             </div>
         );
     };
-
+    
     return (
         <div className="flex h-screen">
             <div ref={sidebarRef} className={`fixed inset-y-0 left-0 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out w-64 bg-gray-900 p-4 z-50`}>
@@ -450,9 +478,9 @@ const App = () => {
                 </div>
             </div>
             <div className="flex-1 bg-gray-800 p-4 flex flex-col">
-                {contentBlockerDetected && (
-                    <div className="bg-red-600 text-white p-4 rounded mb-4">
-                        <p>It seems that a content blocker is preventing posts from being fetched. Please disable your content blocker and refresh the page.                    </p>
+            {contentBlockerDetected && (
+                <div className="bg-red-600 text-white p-4 rounded mb-4">
+                    <p>It seems that a content blocker is preventing posts from being fetched. Please disable your content blocker and refresh the page.</p>
                     <button 
                         className="mt-2 p-2 bg-gray-700 text-white rounded" 
                         onClick={() => window.location.reload()}
@@ -461,75 +489,79 @@ const App = () => {
                     </button>
                 </div>
             )}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center cursor-pointer" onClick={() => { setSelectedPost(null); setViewingSaved(false); }}>
-                    <button className="text-white mr-4" onClick={() => { setSelectedPost(null); setViewingSaved(false); setSidebarOpen(true); }}>
-                        <img src="https://0kb.org/app/zennit/assets/favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
-                    </button>
-                    <div className="ml-2">
-                        <div className="text-white text-xl sm:text-2xl">{selectedSubreddit}</div>
-                    </div>
-                </div>
-                <div className="flex items-center">
-                    <select className="p-2 bg-gray-700 text-white rounded" value={sort} onChange={(e) => setSort(e.target.value)}>
-                        <option value="hot">Hot</option>
-                        <option value="new">New</option>
-                        <option value="top">Top</option>
-                        <option value="rising">Rising</option>
-                    </select>
-                    <button className="text-white ml-4" onClick={fetchPosts}>
-                        <i className="fas fa-sync-alt"></i>
-                    </button>
-                    <button className="text-white ml-4" onClick={() => setViewingSaved(!viewingSaved)}>
-                        {viewingSaved ? <i className="fas fa-bookmark inactive" id="bookmarkIcon"></i> : <i className="fas fa-bookmark active" id="bookmarkIcon"></i>}
-                    </button>
-                </div>
-            </div>
-            <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
-                {loadingPosts && (
-                    <div className="text-white text-center">
-                        <i className="fas fa-yin-yang fa-spin fa-10x"></i>
-                    </div>
-                )}
-                {viewingSaved ? (
-                    <div>
-                        <h2 className="text-white text-xl mb-4">Saved Posts</h2>
-                        <div className="text-gray-400 text-sm mb-4">
-                            <h3 className="text-gray-400 text-sm mt-1" onClick={() => setEditMode(!editMode)}>Edit saved posts</h3>
-                            {renderSavedPosts()}
-                        </div>
-                    </div>
-                ) : selectedPost ? (
-                    <div>
-                        <div className="text-white bg-gray-700 p-2 rounded mt-1 flex items-center">
-                            {selectedPost.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
-                            <span>{selectedPost.title}</span>
-                            <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => savePost(selectedPost)}><i className="fas fa-bookmark inactive" id="bookmarkIcon"></i></button>
-                            <span className="text-gray-400 ml-2 flex items-center">
-                                <i className="fas fa-arrow-up mr-1"></i>
-                                {selectedPost.ups} upvotes
-                            </span>
-                        </div>
-                        <div className="text-gray-400 text-sm mt-1 flex justify-between">
-                            <span>by {selectedPost.author}</span>
-                            <span>{formatDate(selectedPost.created_utc)}</span>
-                        </div>
-                        <div className="text-white bg-gray-700 p-2 rounded mt-1">{renderFormattedText(selectedPost.content)}</div>
-                        {renderPostContent(selectedPost)}
-                        <div className="flex items-center justify-between mt-4">
-                            <div className="flex items-center">
-                                <select className="p-2 bg-gray-700 text-white rounded" value={commentSort} onChange={(e) => { setCommentSort(e.target.value); fetchComments(selectedPost.id); }}>
-                                    <option value="best">Best</option>
-                                    <option value="top">Top</option>
-                                    <option value="new">New</option>
-                                    <option value="controversial">Controversial</option>
-                                </select>
-                                <button className="text-white ml-4" onClick={() => fetchComments(selectedPost.id)}>
-                                    <i className="fas fa-sync-alt"></i>
-                                </button>
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center cursor-pointer" onClick={() => { setSelectedPost(null); setViewingSaved(false); }}>
+                        <button className="text-white mr-4" onClick={() =>  { setSelectedPost(null); setViewingSaved(false); setSidebarOpen(true) }}>
+                            <img src="https://0kb.org/app/zennit/assets/favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
+                        </button>
+                        <div className="ml-2">
+                            <div className="text-white text-xl sm:text-2xl">
+                                {selectedSubreddit.startsWith('user/') && selectedSubreddit.includes('/m/') 
+                                    ? `m/${selectedSubreddit.split('/m/')[1]}`
+                                    : selectedSubreddit}
                             </div>
                         </div>
-                        <div className="text-gray-400 text-sm mt-1">Comments</div>
+                    </div>
+                    <div className="flex items-center">
+                        <select className="p-2 bg-gray-700 text-white rounded" value={sort} onChange={(e) => setSort(e.target.value)}>
+                            <option value="hot">Hot</option>
+                            <option value="new">New</option>
+                            <option value="top">Top</option>
+                            <option value="rising">Rising</option>
+                        </select>
+                        <button className="text-white ml-4" onClick={fetchPosts}>
+                            <i className="fas fa-sync-alt"></i>
+                        </button>
+                        <button className="text-white ml-4" onClick={() => setViewingSaved(!viewingSaved)}>
+                            {viewingSaved ? <i class="fas fa-bookmark inactive" id="bookmarkIcon"></i> : <i class="fas fa-bookmark active" id="bookmarkIcon"></i>}
+                        </button>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
+                    {loadingPosts && (
+                        <div className="text-white text-center">
+                            <i className="fas fa-yin-yang fa-spin fa-10x"></i>
+                        </div>
+                    )}
+                    {viewingSaved ? (
+                        <div>
+                            <h2 className="text-white text-xl mb-4">Saved Posts</h2>
+                            <div className="text-gray-400 text-sm mb-4">
+                            <h3 className="text-gray-400 text-sm mt-1" onClick={() => setEditMode(!editMode)}>Edit saved posts</h3>
+                            {renderSavedPosts()}
+                            </div>
+                        </div>
+                    ) : selectedPost ? (
+                        <div>
+                            <div className="text-white bg-gray-700 p-2 rounded mt-1 flex items-center">
+                                {selectedPost.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
+                                <span>{selectedPost.title}</span>
+                                <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => savePost(selectedPost)}><i class="fas fa-bookmark inactive" id="bookmarkIcon"></i></button>
+                                <span className="text-gray-400 ml-2 flex items-center">
+                                    <i className="fas fa-arrow-up mr-1"></i>
+                                    {selectedPost.ups} upvotes
+                                </span>
+                            </div>
+                            <div className="text-gray-400 text-sm mt-1 flex justify-between">
+                                <span>by {selectedPost.author}</span>
+                                <span>{formatDate(selectedPost.created_utc)}</span>
+                            </div>
+                            <div className="text-white bg-gray-700 p-2 rounded mt-1">{renderFormattedText(selectedPost.content)}</div>
+                            {renderPostContent(selectedPost)}
+                            <div className="flex items-center justify-between mt-4">
+                                <div className="flex items-center">
+                                    <select className="p-2 bg-gray-700 text-white rounded" value={commentSort} onChange={(e) => { setCommentSort(e.target.value); fetchComments(selectedPost.id); }}>
+                                        <option value="best">Best</option>
+                                        <option value="top">Top</option>
+                                        <option value="new">New</option>
+                                        <option value="controversial">Controversial</option>
+                                    </select>
+                                    <button className="text-white ml-4" onClick={() => fetchComments(selectedPost.id)}>
+                                        <i className="fas fa-sync-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                    <div className="text-gray-400 text-sm mt-1">Comments</div>
                         {loadingComments && (
                             <div className="text-white text-center">
                                 <i className="fas fa-yin-yang fa-spin fa-10x"></i>
@@ -541,52 +573,55 @@ const App = () => {
                         <button className="mt-4 p-2 bg-gray-700 text-white rounded" onClick={() => setSelectedPost(null)}>Back to Posts</button>
                     </div>
                 ) : (
-                    posts.map((post, index) => (
-                        <div className="mb-4" key={index}>
-                            <div className="text-white bg-gray-700 p-2 rounded mt-1 flex justify-between items-center">
-                                <div className="flex items-center">
-                                    {post.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
-                                    <span>{post.title}</span>
-                                    <span className="text-gray-400 ml-2 flex items-center">
+                        posts.map((post, index) => (
+                            <div className="mb-4" key={index}>
+                                <div className="text-white bg-gray-700 p-2 rounded mt-1 flex justify-between items-center">
+                                    <div className="flex items-center">
+                                        {post.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
+                                        <span>{post.title}</span>
+                                        <span className="text-gray-400 ml-2 flex items-center">
                                         <i className="fas fa-arrow-up mr-1"></i>
                                         {post.ups}
-                                    </span>
+                                        </span>
+                                    </div>
+                                    <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => viewPost(post.id)}>View Post</button>
                                 </div>
-                                <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => viewPost(post.id)}>View Post</button>
+                                <div className="text-gray-400 text-sm mt-1 flex justify-between">
+                                    <span>by {post.author}</span>
+                                    <span>{formatDate(post.created_utc)}</span>
+                                </div>
                             </div>
-                            <div className="text-gray-400 text-sm mt-1 flex justify-between">
-                                <span>by {post.author}</span>
-                                <span>{formatDate(post.created_utc)}</span>
-                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+            {showPopup && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="bg-gray-800 p-4 rounded">
+                        <div className="text-white mb-4">Do you want to delete {subredditToDelete}?</div>
+                        <div className="flex justify-end">
+                            <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDelete}>Yes</button>
+                            <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDelete}>No</button>
                         </div>
-                    ))
-                )}
-            </div>
+                    </div>
+                </div>
+            )}
+            {showDeletePopup && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="bg-gray-800 p-4 rounded">
+                        <div className="text-white mb-4">Do you want to delete {postToDelete.title}?</div>
+                        <div className="flex justify-end">
+                            <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDeletePost}>Yes</button>
+                            <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDeletePost}>No</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage('')} />}
         </div>
-        {showPopup && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                <div className="bg-gray-800 p-4 rounded">
-                    <div className="text-white mb-4">Do you want to delete {subredditToDelete}?</div>
-                    <div className="flex justify-end">
-                        <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDelete}>Yes</button>
-                        <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDelete}>No</button>
-                    </div>
-                </div>
-            </div>
-        )}
-        {showDeletePopup && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                <div className="bg-gray-800 p-4 rounded">
-                    <div className="text-white mb-4">Do you want to delete {postToDelete.title}?</div>
-                    <div className="flex justify-end">
-                        <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDeletePost}>Yes</button>
-                        <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDeletePost}>No</button>
-                    </div>
-                </div>
-            </div>
-        )}
-        {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage('')} />}
-    </div>
-)
+    )
 }
-ReactDOM.render(<App />, document.getElementById('root'));
+
+const rootElement = document.getElementById('root');
+const root = createRoot(rootElement);
+root.render(<App />);
