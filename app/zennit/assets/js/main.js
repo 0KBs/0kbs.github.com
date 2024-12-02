@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 const { createRoot } = ReactDOM;
-console.warn = (...a) => { if (!/resource\.xyz|js\.compiler/.test(a[0])) console.warn(...a); };
+
 const App = () => {
     const [contentBlockerDetected, setContentBlockerDetected] = useState(false);
     const [loadingPosts, setLoadingPosts] = useState(false);
@@ -399,6 +399,34 @@ const App = () => {
     const renderPostContent = (post) => {
         if (post.url && post.url.includes("https://www.reddit.com/gallery/")) {
             return renderGallery(post);
+        } else if (post.url && post.url.includes("v.redd.it")) {
+            // Embed Reddit videos
+            const videoId = post.url.split('/').pop(); // Get the video ID from the URL
+            return (
+                <iframe
+                    src={`https://v.redd.it/${videoId}/embed`}
+                    width="100%"
+                    height="400"
+                    frameBorder="0"
+                    allowFullScreen
+                    title="Reddit Video"
+                ></iframe>
+            );
+        } else if (post.url && post.url.includes("youtube.com") || post.url.includes("youtu.be")) {
+            // Embed YouTube videos
+            const videoId = post.url.includes("youtu.be") 
+                ? post.url.split('/').pop() 
+                : new URLSearchParams(new URL(post.url).search).get('v');
+            return (
+                <iframe
+                    width="100%"
+                    height="400"
+                    src={`https://www.youtube.com/embed/${videoId}`}
+                    frameBorder="0"
+                    allowFullScreen
+                    title="YouTube Video"
+                ></iframe>
+            );
         } else if (post.url && !post.url.includes("/comments/")) {
             const isRedditUrl = post.url.includes("reddit.com") || post.url.includes("redd.it");
             return isRedditUrl ? (
@@ -409,6 +437,29 @@ const App = () => {
         }
         return null;
     };
+
+    const sharePost = (url) => {
+        if (!url.startsWith('https://')) {
+            url = `https://www.reddit.com${url}`;
+        }
+        if (navigator.share) {
+            navigator.share({
+                title: 'Check out this post on Reddit',
+                url: url
+            }).then(() => {
+                console.log('Post shared successfully');
+            }).catch((error) => {
+                console.error('Error sharing the post:', error);
+            });
+        } else {
+            navigator.clipboard.writeText(url).then(() => {
+                setToastMessage('Post link copied to clipboard!');
+            }).catch((error) => {
+                console.error('Could not copy text: ', error);
+            });
+        }
+    };
+
     const Comment = ({ comment, saveComment  }) => {
         const [isVisible, setIsVisible] = useState(true);
         
@@ -535,7 +586,6 @@ const App = () => {
                             <div className="text-white bg-gray-700 p-2 rounded mt-1 flex items-center">
                                 {selectedPost.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
                                 <span>{selectedPost.title}</span>
-                                <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => savePost(selectedPost)}><i class="fas fa-bookmark inactive" id="bookmarkIcon"></i></button>
                                 <span className="text-gray-400 ml-2 flex items-center">
                                     <i className="fas fa-arrow-up mr-1"></i>
                                     {selectedPost.ups} upvotes
@@ -545,8 +595,19 @@ const App = () => {
                                 <span>by {selectedPost.author}</span>
                                 <span>{formatDate(selectedPost.created_utc)}</span>
                             </div>
-                            <div className="text-white bg-gray-700 p-2 rounded mt-1">{renderFormattedText(selectedPost.content)}</div>
-                            {renderPostContent(selectedPost)}
+                            <div className="text-white bg-gray-700 p-2 rounded mt-1">
+                                {renderFormattedText(selectedPost.content)}
+                                {renderPostContent(selectedPost)}
+                            </div>
+                            <div className="flex items-center mt-4">
+                                <button className="p-2 bg-gray-700 text-white rounded" onClick={() => sharePost(selectedPost.url)}>
+                                    <i className="fas fa-share-alt"></i> Share Post
+                                </button>
+                                <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => savePost(selectedPost)}>
+                                    <i class="fas fa-bookmark inactive" id="bookmarkIcon"></i> Save Post
+                                </button>
+
+                            </div>
                             <div className="flex items-center justify-between mt-4">
                                 <div className="flex items-center">
                                     <select className="p-2 bg-gray-700 text-white rounded" value={commentSort} onChange={(e) => { setCommentSort(e.target.value); fetchComments(selectedPost.id); }}>
