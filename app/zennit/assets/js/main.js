@@ -1,11 +1,5 @@
 const { useState, useEffect, useRef } = React;
 
-const CLIENT_ID = 'Y3ydOPwb0Ghvq-vT03gOHg'; // Replace with your Reddit app's client ID
-const CLIENT_SECRET = 'SvB_BdTL5YbtTaL7xG2PTqR2hc9skg'; // Replace with your Reddit app's client secret
-const REDIRECT_URI = 'https://zen.0kb.org'; // Replace with your redirect URI
-const AUTH_URL = `https://www.reddit.com/api/v1/authorize?client_id=${CLIENT_ID}&response_type=code&state=random_string&redirect_uri=${REDIRECT_URI}&duration=permanent&scope=read`;
-
-
 const App = () => {
     const [contentBlockerDetected, setContentBlockerDetected] = useState(false);
     const [loadingPosts, setLoadingPosts] = useState(false);
@@ -39,119 +33,9 @@ const App = () => {
     const [viewingSaved, setViewingSaved] = useState(false);
     const [postToDelete, setPostToDelete] = useState(null);
     const [showDeletePopup, setShowDeletePopup] = useState(false);
-    const [editMode, setEditMode] = useState(false); // New state for edit mode
+    const [editMode, setEditMode] = useState(false);
+    const [touchStartX, setTouchStartX] = useState(null);
 
-    const loginWithReddit = () => {
-
-        window.location.href = AUTH_URL;
-
-    };
-
-
-    useEffect(() => {
-
-        const urlParams = new URLSearchParams(window.location.search);
-
-        const code = urlParams.get('code');
-
-
-        if (code) {
-
-            // Exchange code for access token
-
-            fetch('https://www.reddit.com/api/v1/access_token', {
-
-                method: 'POST',
-
-                headers: {
-
-                    'Authorization': 'Basic ' + btoa(`${CLIENT_ID}:${CLIENT_SECRET}`),
-
-                    'Content-Type': 'application/x-www-form-urlencoded'
-
-                },
-
-                body: `grant_type=authorization_code&code=${code}&redirect_uri=${REDIRECT_URI}`
-
-            })
-
-            .then(response => response.json())
-
-            .then(data => {
-
-                if (data.access_token) {
-
-                    setAccessToken(data.access_token);
-
-                    // Save the access token to local storage
-
-                    localStorage.setItem('reddit_access_token', data.access_token);
-
-                } else {
-
-                    console.error('Error fetching access token:', data);
-
-                }
-
-            })
-
-            .catch(error => {
-
-                console.error('Fetch error:', error);
-
-            });
-
-        }
-
-    }, []);
-
-
-    const fetchUserData = () => {
-
-        const token = localStorage.getItem('reddit_access_token');
-
-        if (token) {
-
-            fetch('https://oauth.reddit.com/api/v1/me', {
-
-                headers: {
-
-                    'Authorization': `Bearer ${token}`,
-
-                    'User -Agent': 'YOUR_USER_AGENT' // Replace with your user agent
-
-                }
-
-            })
-
-            .then(response => response.json())
-
-            .then(data => {
-
-                console.log('User  data:', data);
-
-            })
-
-            .catch(error => {
-
-                console.error('Error fetching user data:', error);
-
-            });
-
-        }
-
-    };
-
-
-    useEffect(() => {
-
-        if (accessToken) {
-
-            fetchUserData();
-
-        }
-
-    }, [accessToken]);
     const fetchPosts = (page = 0) => {
         setLoadingPosts(true);
         fetch(`https://www.reddit.com/${selectedSubreddit}/${sort}.json?count=${(page - 1) * 25}`)
@@ -180,7 +64,6 @@ const App = () => {
                 setPosts(prevPosts => [...fetchedPosts]);
                 setContentBlockerDetected(false);
             })
-        
             .catch(error => {
                 console.error('Fetch error:', error);
                 setContentBlockerDetected(true);
@@ -192,7 +75,12 @@ const App = () => {
 
     const fetchComments = (postId) => {
         setLoadingComments(true);
-        fetch(`https://www.reddit.com/${selectedSubreddit}/comments/${postId}.json?sort=${commentSort}`)
+        
+        // Find the post to get its subreddit_name_prefixed
+        const post = posts.find(p => p.id === postId) || savedPosts.find(p => p.id === postId);
+        const subredditToUse = post ? post.subreddit_name_prefixed : selectedSubreddit;
+    
+        fetch(`https://www.reddit.com/${subredditToUse}/comments/${postId}.json?sort=${commentSort}`)
             .then(response => response.json())
             .then(data => {
                 const postTitle = data[0].data.children[0].data.title.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
@@ -220,6 +108,7 @@ const App = () => {
     
                     return { ...commentData, isVisible: true };
                 });
+    
                 setComments(fetchedComments);
                 setCommentVisibility(new Array(fetchedComments.length).fill(true));
             })
@@ -253,18 +142,19 @@ const App = () => {
     };
 
     const confirmDeletePost = () => {
-        setSavedPosts(savedPosts.filter(p => p.id !== postToDelete.id));
-        localStorage.setItem('savedPosts', JSON.stringify(savedPosts.filter(p => p.id !== postToDelete.id)));
+        const updatedSavedPosts = savedPosts.filter(p => p.id !== postToDelete.id);
+        setSavedPosts(updatedSavedPosts);
+        localStorage.setItem('savedPosts', JSON.stringify(updatedSavedPosts));
         setShowDeletePopup(false);
         setPostToDelete(null);
         setToastMessage('Post removed from bookmarks!');
     };
-    
+
     const cancelDeletePost = () => {
         setShowDeletePopup(false);
         setPostToDelete(null);
     };
-    
+
     const renderSavedPosts = () => {
         return savedPosts.map((post, index) => (
             <div className="mb-4" key={index}>
@@ -289,12 +179,10 @@ const App = () => {
         ));
     };
 
-
     useEffect(() => {
         setPosts([]);
         fetchPosts(currentPage);
     }, [selectedSubreddit, sort]);
-
 
     useEffect(() => {
         localStorage.setItem('subreddits', JSON.stringify(subreddits));
@@ -325,7 +213,8 @@ const App = () => {
     };
 
     const confirmDelete = () => {
-        setSubreddits(subreddits.filter(sub => sub.name !== subredditToDelete));
+        const updatedSubreddits = subreddits.filter(sub => sub.name !== subredditToDelete);
+        setSubreddits(updatedSubreddits);
         setShowPopup(false);
         setSubredditToDelete(null);
         setToastMessage('Subreddit removed!');
@@ -351,7 +240,8 @@ const App = () => {
                     onContextMenu={(e) => handleRightClick(e, subreddit.name)}
                 >
                     {subreddit.name}
-                </div>
+
+                    </div>
                 {editMode && (
                     <button 
                         className="text-red-500 ml-2" 
@@ -360,7 +250,7 @@ const App = () => {
                             setShowPopup(true);
                         }}
                     >
-                        <i className="fas fa-times"></i> {/* Red X icon */}
+                        <i className="fas fa-times"></i>
                     </button>
                 )}
             </div>
@@ -399,14 +289,12 @@ const App = () => {
         }
     };
 
-    const [touchStartX, setTouchStartX] = useState(null);
-
     const Toast = ({ message, onClose }) => {
         useEffect(() => {
-            const timer = setTimeout(onClose, 3000); // Automatically close after 3 seconds
+            const timer = setTimeout(onClose, 3000);
             return () => clearTimeout(timer);
         }, [onClose]);
-    
+
         return (
             <div className="fixed bottom-4 right-4 bg-green-500 text-white p-2 rounded shadow-lg">
                 {message}
@@ -427,65 +315,56 @@ const App = () => {
     };
 
     const renderFormattedText = (text) => {
-        // Check if text is valid
         if (!text || typeof text !== 'string') {
             return null;
         }
-    
-        let formattedText = text;
-    
-        // Sanitize text
-        formattedText = formattedText.replace(/\\/g, '');
-        formattedText = formattedText.replace(/\n\n+/g, '\n');
-    
-        // Handle links
+
+        let formattedText = text
+            .replace(/\\/g, '')
+            .replace(/\n\n+/g, '\n');
+
         const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
         formattedText = formattedText.replace(linkRegex, (match, p1, p2) => {
             return `<a href="${p2}" class="text-blue-500 underline">${p1}</a>`;
         });
-    
-        // Handle preview Reddit images
+
         const previewRedditRegex = /(https?:\/\/preview\.redd\.it\/[^\s]+)/g;
         formattedText = formattedText.replace(previewRedditRegex, (match) => {
             return `<img src="${match}" alt="Comment embedded content" class="mt-2 rounded" height="30%" width="30%" />`;
         });
-    
-        // Handle inline formatting
+
         const inlineRegex = [
             { regex: /~~(.*?)~~/g, tag: 'del' },
-            { regex: /\^(\S+)/g, tag:'sup' },
+            { regex: /\^(\S+)/g, tag: 'sup' },
             { regex: /`(.*?)`/g, tag: 'code' }
         ];
-    
+
         inlineRegex.forEach(({ regex, tag }) => {
             formattedText = formattedText.replace(regex, (match, p1) => {
                 return `<${tag}>${p1}</${tag}>`;
             });
         });
-    
-        // Handle markdown formatting
+
         const markdownRegex = [
-            { regex: /(\*\*\*|___)(.*?)\1/g, tag:'strong', className: 'italic' },
-            { regex: /(\*\*|__)(.*?)\1/g, tag:'strong' },
+            { regex: /(\*\*\*|___)(.*?)\1/g, tag: 'strong', className: 'italic' },
+            { regex: /(\*\*|__)(.*?)\1/g, tag: 'strong' },
             { regex: /(\*|_)(.*?)\1/g, tag: 'em' }
         ];
-    
+
         markdownRegex.forEach(({ regex, tag, className }) => {
             formattedText = formattedText.replace(regex, (match, p1, p2) => {
                 return `<${tag} class="${className || ''}">${p2}</${tag}>`;
             });
         });
-    
-        // Handle code blocks
+
         const codeBlockRegex = /((?:^|\n)(?: {4}.*\n)+)/g;
         formattedText = formattedText.replace(codeBlockRegex, (match, p1) => {
             const codeContent = p1.replace(/^ {4}/gm, '');
             return `<pre>${codeContent}</pre>`;
         });
-    
-        // Replace newlines with <br/>
+
         formattedText = formattedText.replace(/\n/g, '<br/>');
-    
+
         return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
     };
 
@@ -502,7 +381,8 @@ const App = () => {
         }
         return null;
     };
-    const Comment = ({ comment, saveComment  }) => {
+
+    const Comment = ({ comment }) => {
         const [isVisible, setIsVisible] = useState(true);
         
         const toggleVisibility = () => {
@@ -536,7 +416,7 @@ const App = () => {
             </div>
         );
     };
-    
+
     return (
         <div className="flex h-screen">
             <div ref={sidebarRef} className={`fixed inset-y-0 left-0 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out w-64 bg-gray-900 p-4 z-50`}>
@@ -570,9 +450,9 @@ const App = () => {
                 </div>
             </div>
             <div className="flex-1 bg-gray-800 p-4 flex flex-col">
-            {contentBlockerDetected && (
-                <div className="bg-red-600 text-white p-4 rounded mb-4">
-                    <p>It seems that a content blocker is preventing posts from being fetched. Please disable your content blocker and refresh the page.</p>
+                {contentBlockerDetected && (
+                    <div className="bg-red-600 text-white p-4 rounded mb-4">
+                        <p>It seems that a content blocker is preventing posts from being fetched. Please disable your content blocker and refresh the page.                    </p>
                     <button 
                         className="mt-2 p-2 bg-gray-700 text-white rounded" 
                         onClick={() => window.location.reload()}
@@ -581,75 +461,75 @@ const App = () => {
                     </button>
                 </div>
             )}
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center cursor-pointer" onClick={() => { setSelectedPost(null); setViewingSaved(false); }}>
-                        <button className="text-white mr-4" onClick={() =>  { setSelectedPost(null); setViewingSaved(false); setSidebarOpen(true) }}>
-                            <img src="https://0kb.org/app/zennit/assets/favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
-                        </button>
-                        <div className="ml-2">
-                            <div className="text-white text-xl sm:text-2xl">{selectedSubreddit}</div>
-                        </div>
-                    </div>
-                    <div className="flex items-center">
-                        <select className="p-2 bg-gray-700 text-white rounded" value={sort} onChange={(e) => setSort(e.target.value)}>
-                            <option value="hot">Hot</option>
-                            <option value="new">New</option>
-                            <option value="top">Top</option>
-                            <option value="rising">Rising</option>
-                        </select>
-                        <button className="text-white ml-4" onClick={fetchPosts}>
-                            <i className="fas fa-sync-alt"></i>
-                        </button>
-                        <button className="text-white ml-4" onClick={() => setViewingSaved(!viewingSaved)}>
-                            {viewingSaved ? <i class="fas fa-bookmark inactive" id="bookmarkIcon"></i> : <i class="fas fa-bookmark active" id="bookmarkIcon"></i>}
-                        </button>
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center cursor-pointer" onClick={() => { setSelectedPost(null); setViewingSaved(false); }}>
+                    <button className="text-white mr-4" onClick={() => { setSelectedPost(null); setViewingSaved(false); setSidebarOpen(true); }}>
+                        <img src="https://0kb.org/app/zennit/assets/favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
+                    </button>
+                    <div className="ml-2">
+                        <div className="text-white text-xl sm:text-2xl">{selectedSubreddit}</div>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
-                    {loadingPosts && (
-                        <div className="text-white text-center">
-                            <i className="fas fa-yin-yang fa-spin fa-10x"></i>
-                        </div>
-                    )}
-                    {viewingSaved ? (
-                        <div>
-                            <h2 className="text-white text-xl mb-4">Saved Posts</h2>
-                            <div className="text-gray-400 text-sm mb-4">
+                <div className="flex items-center">
+                    <select className="p-2 bg-gray-700 text-white rounded" value={sort} onChange={(e) => setSort(e.target.value)}>
+                        <option value="hot">Hot</option>
+                        <option value="new">New</option>
+                        <option value="top">Top</option>
+                        <option value="rising">Rising</option>
+                    </select>
+                    <button className="text-white ml-4" onClick={fetchPosts}>
+                        <i className="fas fa-sync-alt"></i>
+                    </button>
+                    <button className="text-white ml-4" onClick={() => setViewingSaved(!viewingSaved)}>
+                        {viewingSaved ? <i className="fas fa-bookmark inactive" id="bookmarkIcon"></i> : <i className="fas fa-bookmark active" id="bookmarkIcon"></i>}
+                    </button>
+                </div>
+            </div>
+            <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
+                {loadingPosts && (
+                    <div className="text-white text-center">
+                        <i className="fas fa-yin-yang fa-spin fa-10x"></i>
+                    </div>
+                )}
+                {viewingSaved ? (
+                    <div>
+                        <h2 className="text-white text-xl mb-4">Saved Posts</h2>
+                        <div className="text-gray-400 text-sm mb-4">
                             <h3 className="text-gray-400 text-sm mt-1" onClick={() => setEditMode(!editMode)}>Edit saved posts</h3>
                             {renderSavedPosts()}
+                        </div>
+                    </div>
+                ) : selectedPost ? (
+                    <div>
+                        <div className="text-white bg-gray-700 p-2 rounded mt-1 flex items-center">
+                            {selectedPost.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
+                            <span>{selectedPost.title}</span>
+                            <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => savePost(selectedPost)}><i className="fas fa-bookmark inactive" id="bookmarkIcon"></i></button>
+                            <span className="text-gray-400 ml-2 flex items-center">
+                                <i className="fas fa-arrow-up mr-1"></i>
+                                {selectedPost.ups} upvotes
+                            </span>
+                        </div>
+                        <div className="text-gray-400 text-sm mt-1 flex justify-between">
+                            <span>by {selectedPost.author}</span>
+                            <span>{formatDate(selectedPost.created_utc)}</span>
+                        </div>
+                        <div className="text-white bg-gray-700 p-2 rounded mt-1">{renderFormattedText(selectedPost.content)}</div>
+                        {renderPostContent(selectedPost)}
+                        <div className="flex items-center justify-between mt-4">
+                            <div className="flex items-center">
+                                <select className="p-2 bg-gray-700 text-white rounded" value={commentSort} onChange={(e) => { setCommentSort(e.target.value); fetchComments(selectedPost.id); }}>
+                                    <option value="best">Best</option>
+                                    <option value="top">Top</option>
+                                    <option value="new">New</option>
+                                    <option value="controversial">Controversial</option>
+                                </select>
+                                <button className="text-white ml-4" onClick={() => fetchComments(selectedPost.id)}>
+                                    <i className="fas fa-sync-alt"></i>
+                                </button>
                             </div>
                         </div>
-                    ) : selectedPost ? (
-                        <div>
-                            <div className="text-white bg-gray-700 p-2 rounded mt-1 flex items-center">
-                                {selectedPost.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
-                                <span>{selectedPost.title}</span>
-                                <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => savePost(selectedPost)}><i class="fas fa-bookmark inactive" id="bookmarkIcon"></i></button>
-                                <span className="text-gray-400 ml-2 flex items-center">
-                                    <i className="fas fa-arrow-up mr-1"></i>
-                                    {selectedPost.ups} upvotes
-                                </span>
-                            </div>
-                            <div className="text-gray-400 text-sm mt-1 flex justify-between">
-                                <span>by {selectedPost.author}</span>
-                                <span>{formatDate(selectedPost.created_utc)}</span>
-                            </div>
-                            <div className="text-white bg-gray-700 p-2 rounded mt-1">{renderFormattedText(selectedPost.content)}</div>
-                            {renderPostContent(selectedPost)}
-                            <div className="flex items-center justify-between mt-4">
-                                <div className="flex items-center">
-                                    <select className="p-2 bg-gray-700 text-white rounded" value={commentSort} onChange={(e) => { setCommentSort(e.target.value); fetchComments(selectedPost.id); }}>
-                                        <option value="best">Best</option>
-                                        <option value="top">Top</option>
-                                        <option value="new">New</option>
-                                        <option value="controversial">Controversial</option>
-                                    </select>
-                                    <button className="text-white ml-4" onClick={() => fetchComments(selectedPost.id)}>
-                                        <i className="fas fa-sync-alt"></i>
-                                    </button>
-                                </div>
-                            </div>
-                    <div className="text-gray-400 text-sm mt-1">Comments</div>
+                        <div className="text-gray-400 text-sm mt-1">Comments</div>
                         {loadingComments && (
                             <div className="text-white text-center">
                                 <i className="fas fa-yin-yang fa-spin fa-10x"></i>
@@ -661,53 +541,52 @@ const App = () => {
                         <button className="mt-4 p-2 bg-gray-700 text-white rounded" onClick={() => setSelectedPost(null)}>Back to Posts</button>
                     </div>
                 ) : (
-                        posts.map((post, index) => (
-                            <div className="mb-4" key={index}>
-                                <div className="text-white bg-gray-700 p-2 rounded mt-1 flex justify-between items-center">
-                                    <div className="flex items-center">
-                                        {post.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
-                                        <span>{post.title}</span>
-                                        <span className="text-gray-400 ml-2 flex items-center">
+                    posts.map((post, index) => (
+                        <div className="mb-4" key={index}>
+                            <div className="text-white bg-gray-700 p-2 rounded mt-1 flex justify-between items-center">
+                                <div className="flex items-center">
+                                    {post.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
+                                    <span>{post.title}</span>
+                                    <span className="text-gray-400 ml-2 flex items-center">
                                         <i className="fas fa-arrow-up mr-1"></i>
                                         {post.ups}
-                                        </span>
-                                    </div>
-                                    <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => viewPost(post.id)}>View Post</button>
+                                    </span>
                                 </div>
-                                <div className="text-gray-400 text-sm mt-1 flex justify-between">
-                                    <span>by {post.author}</span>
-                                    <span>{formatDate(post.created_utc)}</span>
-                                </div>
+                                <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => viewPost(post.id)}>View Post</button>
                             </div>
-                        ))
-                    )}
+                            <div className="text-gray-400 text-sm mt-1 flex justify-between">
+                                <span>by {post.author}</span>
+                                <span>{formatDate(post.created_utc)}</span>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+        {showPopup && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-gray-800 p-4 rounded">
+                    <div className="text-white mb-4">Do you want to delete {subredditToDelete}?</div>
+                    <div className="flex justify-end">
+                        <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDelete}>Yes</button>
+                        <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDelete}>No</button>
+                    </div>
                 </div>
             </div>
-            {showPopup && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-gray-800 p-4 rounded">
-                        <div className="text-white mb-4">Do you want to delete {subredditToDelete}?</div>
-                        <div className="flex justify-end">
-                            <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDelete}>Yes</button>
-                            <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDelete}>No</button>
-                        </div>
+        )}
+        {showDeletePopup && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-gray-800 p-4 rounded">
+                    <div className="text-white mb-4">Do you want to delete {postToDelete.title}?</div>
+                    <div className="flex justify-end">
+                        <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDeletePost}>Yes</button>
+                        <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDeletePost}>No</button>
                     </div>
                 </div>
-            )}
-            {showDeletePopup && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-gray-800 p-4 rounded">
-                        <div className="text-white mb-4">Do you want to delete {postToDelete.title}?</div>
-                        <div className="flex justify-end">
-                            <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDeletePost}>Yes</button>
-                            <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDeletePost}>No</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage('')} />}
-        </div>
-    )
+            </div>
+        )}
+        {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage('')} />}
+    </div>
+)
 }
-
 ReactDOM.render(<App />, document.getElementById('root'));
