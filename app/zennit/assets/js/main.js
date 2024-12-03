@@ -373,12 +373,18 @@ const App = () => {
             </div>
         );
     };
+    const decodeHtmlEntities = (text) => {
+        const textarea = document.createElement('textarea');
+        textarea.innerHTML = text;
+        return textarea.value;
+    };
 
     const renderFormattedText = (text) => {
+        console.log("text: ", text);
         if (!text || typeof text !== 'string') {
             return null;
         }
-
+        const decodedText = decodeHtmlEntities(text);
         let formattedText = text;
         formattedText = formattedText.replace(/\\/g, '');
         formattedText = formattedText.replace(/\n\n+/g, '\n');
