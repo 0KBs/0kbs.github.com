@@ -59,3 +59,11 @@ pre {
 button {
     margin-left: 10px;
 }
+
+blockquote {
+    border-left: 4px solid #ccc;
+    padding-left: 10px;
+    color: #999;
+    margin: 10px 0;
+    font-style: italic;
+}
