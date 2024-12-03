@@ -392,10 +392,12 @@ const App = () => {
         });
         
         // Handle blockquotes
-        formattedText = formattedText.replace(/^\s*>\s*(.+)$/gm, (match, content) => {
-            return `<blockquote style="border-left: 4px solid #ccc; padding-left: 10px; color: #999;">${content}</blockquote>`;
-        });
         
+        formattedText = formattedText.replace(/^\s*>\s*(.+)$/gm, (match, content) => {
+            console.log("Matched blockquote content:", content); // Debugging line
+            return `<blockquote style="border-left: 4px solid #ccc; padding-left: 10px; color: #999;">${content.trim()}</blockquote>`;
+        });
+
         formattedText = formattedText.replace(/^(#{1,6})\s*(.+)$/gm, (match, hashes, content) => {
             const level = hashes.length;
             const fontSize = `${(6 - level) * 0.25 + 1}em`;
@@ -446,7 +448,7 @@ const App = () => {
         });
     
         formattedText = formattedText.replace(/\n/g, '<br/>');
-        
+        console.log("Formatted text:", formattedText);
         return (
             <div>
                 <span dangerouslySetInnerHTML={{ __html: formattedText }} />
