@@ -35,8 +35,15 @@ const App = () => {
     const [postToDelete, setPostToDelete] = useState(null);
     const [showDeletePopup, setShowDeletePopup] = useState(false);
     const [editMode, setEditMode] = useState(false);
+    const [enlargedImage, setEnlargedImage] = useState(null);
 
-    
+    const handleImageClick = (src) => {
+        setEnlargedImage(src);
+    };
+
+    const handleCloseImage = () => {
+        setEnlargedImage(null);
+    };
 
     const fetchPosts = (page = 0) => {
         setLoadingPosts(true);
@@ -68,11 +75,13 @@ const App = () => {
                     gallery_data: child.data.gallery_data,
                     media_metadata: child.data.media_metadata,
                     pinned: child.data.stickied,
-                    ups: child.data.ups - child.data.downs
+                    ups: child.data.ups - child.data.downs,
+                    media: child.data.media
                 }));
-    
+                
                 setPosts(prevPosts => [...fetchedPosts]);
                 setContentBlockerDetected(false);
+
             })
             .catch(error => {
                 console.error('Fetch error:', error);
@@ -333,13 +342,26 @@ const App = () => {
     const renderGallery = (post) => {
         if (!post.gallery_data || !post.media_metadata) return null;
 
+    
         const items = post.gallery_data.items.map(item => {
             const media = post.media_metadata[item.media_id];
             const src = media.s.u.replace(/&amp;/g, '&');
-            return <img key={item.media_id} src={src} alt="Gallery item" className="w-full h-auto rounded mt-2 max-w-full" height="30%" width="30%" />;
+            return (
+                <img
+                    key={item.media_id}
+                    src={src}
+                    alt="Gallery item"
+                    className="w-1/4 h-auto rounded mt-2 cursor-pointer"
+                    onClick={() => handleImageClick(src)}
+                />
+            );
         });
 
-        return <div className="gallery">{items}</div>;
+        return (
+            <div className="overflow-x-auto whitespace-nowrap flex">
+                {items}
+            </div>
+        );
     };
 
     const renderFormattedText = (text) => {
@@ -397,25 +419,22 @@ const App = () => {
     };
 
     const renderPostContent = (post) => {
-        if (post.url && post.url.includes("https://www.reddit.com/gallery/")) {
-            return renderGallery(post);
-        } else if (post.url && post.url.includes("v.redd.it")) {
-            // Embed Reddit videos
-            const videoURL = post.media.reddit_video.fallback_url; // Get the video ID from the URL
+        if (post.media && post.media.reddit_video) {
             return (
-                <video width="100%" height="100%" controls>
-                <source src={videoURL} type="video/mp4" />
+                <video controls width="400" height="400">
+                    <source src={post.media.reddit_video.fallback_url} type="video/mp4" />
                     Your browser does not support the video tag.
                 </video>
             );
+        } else if (post.url && post.url.includes("https://www.reddit.com/gallery/")) {
+            return renderGallery(post);
         } else if (post.url && post.url.includes("youtube.com") || post.url.includes("youtu.be")) {
-            // Embed YouTube videos
             const videoId = post.url.includes("youtu.be") 
                 ? post.url.split('/').pop() 
                 : new URLSearchParams(new URL(post.url).search).get('v');
             return (
                 <iframe
-                    width="100%"
+                    width="400"
                     height="400"
                     src={`https://www.youtube.com/embed/${videoId}`}
                     frameBorder="0"
@@ -426,7 +445,14 @@ const App = () => {
         } else if (post.url && !post.url.includes("/comments/")) {
             const isRedditUrl = post.url.includes("reddit.com") || post.url.includes("redd.it");
             return isRedditUrl ? (
-                <img src={post.url} alt="Post content" className="mt-2 rounded max-w-full" height="30%" width="30%" />
+                <img 
+                    src={post.url} 
+                    alt="Post content" 
+                    className="mt-2 rounded max-w-full cursor-pointer" 
+                    height="30%" 
+                    width="30%" 
+                    onClick={() => handleImageClick(post.url)} // Add this line
+                />
             ) : (
                 <a href={post.url} className="text-blue-500 underline mt-2 block">{post.url}</a>
             );
@@ -456,13 +482,13 @@ const App = () => {
         }
     };
 
-    const Comment = ({ comment, saveComment  }) => {
+    const Comment = ({ comment }) => {
         const [isVisible, setIsVisible] = useState(true);
         
         const toggleVisibility = () => {
             setIsVisible(!isVisible);
         };
-
+    
         return (
             <div className="text-white bg-gray-700 p-2 rounded mt-1">
                 <div className="flex items-center text-gray-400 text-sm">
@@ -476,7 +502,17 @@ const App = () => {
                         <span className="text-gray-400"><i className="fas fa-arrow-up"></i> {comment.ups} upvotes</span>
                         <div>{renderFormattedText(comment.body)}</div>
                         {comment.media_metadata && comment.media_metadata.length > 0 && (
-                            <img src={comment.media_metadata[0].s.u} alt="Comment embedded content" className="mt-2 rounded" height="30%" width="30%" />
+                            comment.media_metadata.map((media, index) => (
+                                <img 
+                                    key={index}
+                                    src={media.s.u} 
+                                    alt="Comment embedded content" 
+                                    className="mt-2 rounded cursor-pointer" 
+                                    height="30%" 
+                                    width="30%" 
+                                    onClick={() => handleImageClick(media.s.u)} // Ensure click handler is here
+                                />
+                            ))
                         )}
                         {comment.replies && comment.replies.length > 0 && (
                             <div className="ml-4">
@@ -650,7 +686,13 @@ const App = () => {
                         ))
                     )}
                 </div>
+                {enlargedImage && ( // Move this block here
+                    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75" onClick={handleCloseImage}>
+                        <img src={enlargedImage} alt="Enlarged" className="max-w-full max-h-full" />
+                    </div>
+                )}
             </div>
+            
             {showPopup && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
                     <div className="bg-gray-800 p-4 rounded">
