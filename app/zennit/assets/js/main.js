@@ -27,14 +27,36 @@ const App = () => {
     const [editMode, setEditMode] = useState(false);
     const [enlargedImage, setEnlargedImage] = useState(null);
     const [enlargedCommentImage, setEnlargedCommentImage] = useState(null);
-    const [isSwiping, setIsSwiping] = useState(false);
-    const swipeThreshold = 50;
-    const [touchStartX, setTouchStartX] = useState(null);
-    const [touchEndX, setTouchEndX] = useState(null);
     const [showSettings, setShowSettings] = useState(false);
     const [viewingAbout, setViewingAbout] = useState(false);
     const [showClearCachePopup, setShowClearCachePopup] = useState(false);
 
+    const hammerRef = useRef(null);
+
+    useEffect(() => {
+        // Initialize Hammer.js on the root element
+        hammerRef.current = new Hammer(document.getElementById('root'));
+        hammerRef.current.on('swipe', handleSwipe);
+
+        return () => {
+            hammerRef.current.off('swipe', handleSwipe);
+            hammerRef.current = null;
+        };
+    }, []);
+
+    const handleSwipe = (event) => {
+        if (event.direction === Hammer.DIRECTION_RIGHT) {
+            if (selectedPost) {
+                // If a specific post is open, close it and open the post feed
+                setSelectedPost(null);
+                setViewingSaved(false);
+                setViewingAbout(false);
+            } else {
+                // If the post feed is open, open the sidebar
+                setSidebarOpen(true);
+            }
+        }
+    };
 
     // Main functions.
     const fetchPosts = (page) => {
@@ -925,63 +947,10 @@ const App = () => {
         );
     };
 
-    const handleTouchStart = (e) => {
-        const touch = e.touches[0];
-        setTouchStartX(touch.clientX);
-        setIsSwiping(false); // Reset swiping flag
-    };
-    
-    const handleTouchMove = (e) => {
-        const touch = e.touches[0];
-        setTouchEndX(touch.clientX);
-        const touchDiff = touchEndX - touchStartX;
-    
-        // If the touch moves beyond the threshold, set isSwiping to true
-        if (Math.abs(touchDiff) > swipeThreshold) {
-            setIsSwiping(true);
-        }
-    };
-    
-    const handleTouchEnd = (e) => {
-        if (touchStartX === null || touchEndX === null) return;
-    
-        const touchDiff = touchEndX - touchStartX;
-    
-        // Only open the sidebar if it's a swipe gesture
-        if (isSwiping) {
-            if (touchDiff > swipeThreshold) {
-                setSidebarOpen(true); // Swipe right to open sidebar
-            } else if (touchDiff < -swipeThreshold && selectedPost) {
-                setSelectedPost(null); // Swipe left to close post
-            }
-        } else {
-            // Handle tap actions here
-            const target = e.target; // Get the target of the touchend event
-            if (target) {
-                // Check if the target is a clickable element
-                if (target.matches('.clickable')) {
-                    // Execute the click action
-                    target.click(); // Trigger the click event
-                }
-            }
-        }
-    
-        // Reset touch states
-        setTouchStartX(null);
-        setTouchEndX(null);
-        setIsSwiping(false);
-    };
-    
+
 
     return (
-        <div className="flex h-screen" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onClick={(e) => {
-            // Handle click actions for elements that should respond to taps
-            const target = e.target;
-            if (target.matches('.clickable')) {
-                // Execute the click action
-                target.click();
-            }
-        }}>
+        <div className="flex h-screen">
             <div>
                 {renderSidebar()}
                 {showPopup && (renderSubredditDeletePopup())}
