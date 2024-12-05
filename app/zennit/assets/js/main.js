@@ -974,7 +974,14 @@ const App = () => {
     
 
     return (
-        <div className="flex h-screen" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+        <div className="flex h-screen" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onClick={(e) => {
+            // Handle click actions for elements that should respond to taps
+            const target = e.target;
+            if (target.matches('.clickable')) {
+                // Execute the click action
+                target.click();
+            }
+        }}>
             <div>
                 {renderSidebar()}
                 {showPopup && (renderSubredditDeletePopup())}
