@@ -942,7 +942,7 @@ const App = () => {
         }
     };
     
-    const handleTouchEnd = () => {
+    const handleTouchEnd = (e) => {
         if (touchStartX === null || touchEndX === null) return;
     
         const touchDiff = touchEndX - touchStartX;
@@ -955,8 +955,15 @@ const App = () => {
                 setSelectedPost(null); // Swipe left to close post
             }
         } else {
-            // Handle tap actions here (e.g., opening settings, enlarging images)
-            // You can add logic to handle taps on specific elements
+            // Handle tap actions here
+            const target = e.target; // Get the target of the touchend event
+            if (target) {
+                // Check if the target is a clickable element
+                if (target.matches('.clickable')) {
+                    // Execute the click action
+                    target.click(); // Trigger the click event
+                }
+            }
         }
     
         // Reset touch states
@@ -964,6 +971,7 @@ const App = () => {
         setTouchEndX(null);
         setIsSwiping(false);
     };
+    
 
     return (
         <div className="flex h-screen" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
