@@ -5,14 +5,8 @@ const App = () => {
     const [contentBlockerDetected, setContentBlockerDetected] = useState(false);
     const [loadingPosts, setLoadingPosts] = useState(false);
     const [loadingComments, setLoadingComments] = useState(false);
-    const [subreddits, setSubreddits] = useState(() => {
-        const savedSubreddits = localStorage.getItem('subreddits');
-        return savedSubreddits ? JSON.parse(savedSubreddits) : [{ name: 'r/Zennit' }];
-    });
-    const [selectedSubreddit, setSelectedSubreddit] = useState(() => {
-        const savedSubreddit = localStorage.getItem('selectedSubreddit');
-        return savedSubreddit ? savedSubreddit : 'r/Zennit';
-    });
+    const [subreddits, setSubreddits] = useState(() => JSON.parse(localStorage.getItem('subreddits') || '[{"name": "r/Zennit"}]'));
+    const [selectedSubreddit, setSelectedSubreddit] = useState(localStorage.getItem('selectedSubreddit') || 'r/Zennit');
     const [posts, setPosts] = useState([]);
     const [selectedPost, setSelectedPost] = useState(null);
     const [comments, setComments] = useState([]);
@@ -25,29 +19,23 @@ const App = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const sidebarRef = useRef(null);
     const [commentVisibility, setCommentVisibility] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [hasMorePosts, setHasMorePosts] = useState(true);
-    const [savedPosts, setSavedPosts] = useState(() => {
-        const saved = localStorage.getItem('savedPosts');
-        return saved ? JSON.parse(saved) : [];
-    });
+    const [currentPage] = useState(1);
+    const [savedPosts, setSavedPosts] = useState(JSON.parse(localStorage.getItem('savedPosts') || '[]'));
     const [viewingSaved, setViewingSaved] = useState(false);
     const [postToDelete, setPostToDelete] = useState(null);
     const [showDeletePopup, setShowDeletePopup] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [enlargedImage, setEnlargedImage] = useState(null);
     const [enlargedCommentImage, setEnlargedCommentImage] = useState(null);
+    //const [touchStartX, setTouchStartX] = useState(null);
+    //const [touchEndX, setTouchEndX] = useState(null);
+    const [showSettings, setShowSettings] = useState(false);
+    const [viewingAbout, setViewingAbout] = useState(false);
+    const [showClearCachePopup, setShowClearCachePopup] = useState(false);
 
 
-    const handleImageClick = (src) => {
-        setEnlargedImage(src);
-    };
-
-    const handleCloseImage = () => {
-        setEnlargedImage(null);
-    };
-
-    const fetchPosts = (page = 0) => {
+    // Main functions.
+    const fetchPosts = (page) => {
         setLoadingPosts(true);
         let fetchUrl;
         if (selectedSubreddit.startsWith('u/')) {
@@ -92,15 +80,6 @@ const App = () => {
             .finally(() => {
                 setLoadingPosts(false);
             });
-    };
-
-    const formatUpvotes = (upvotes) => {
-        if (upvotes >= 100000) {
-            return `${Math.floor(upvotes / 1000)}K`;
-        } else if (upvotes >= 1000) {
-            return `${(upvotes / 1000).toFixed(1)}K`;
-        }
-        return upvotes.toString();
     };
 
     const fetchComments = (postId) => {
@@ -152,83 +131,198 @@ const App = () => {
             });
     };
 
-    const toggleCommentVisibility = (index) => {
-        const updatedVisibility = [...commentVisibility];
-        updatedVisibility[index] = !updatedVisibility[index];
-        setCommentVisibility(updatedVisibility);
+    const formatDate = (timestamp) => {
+        const date = new Date(timestamp * 1000);
+        const userLocale = navigator.language || 'en-US';
+        const formattedDate = date.toLocaleDateString(userLocale, { 
+            year: '2-digit', 
+            month: '2-digit', 
+            day: '2-digit' 
+        });
+        const formattedTime = date.toLocaleTimeString(userLocale, { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            hour12: false
+        });
+        return `${formattedDate} ${formattedTime}`;
     };
 
-    const savePost = (post) => {
-        if (!savedPosts.some(savedPost => savedPost.id === post.id)) {
-            const updatedSavedPosts = [...savedPosts, post];
-            setSavedPosts(updatedSavedPosts);
-            localStorage.setItem('savedPosts', JSON.stringify(updatedSavedPosts));
-            setToastMessage('Post saved!');
+    const formatUpvotes = (upvotes) => {
+        if (upvotes >= 100000) {
+            return `${Math.floor(upvotes / 1000)}K`;
+        } else if (upvotes >= 1000) {
+            return `${(upvotes / 1000).toFixed(1)}K`;
         }
+        return upvotes.toString();
     };
 
-    const handleSavedPostRightClick = (e, post) => {
-        e.preventDefault();
-        setPostToDelete(post);
-        setShowDeletePopup(true);
+    const renderContentBlocked = () => {
+        return (
+            <div className="bg-red-600 text-white p-4 rounded mb-4">
+                <p>It seems that a content blocker is preventing posts from being fetched. Please disable your content blocker and refresh the page.</p>
+                <button 
+                    className="mt-2 p-2 bg-gray-700 text-white rounded" 
+                    onClick={() => window.location.reload()}
+                >
+                    Refresh Page
+                </button>
+            </div>
+        )
     };
 
-    const confirmDeletePost = () => {
-        setSavedPosts(savedPosts.filter(p => p.id !== postToDelete.id));
-        localStorage.setItem('savedPosts', JSON.stringify(savedPosts.filter(p => p.id !== postToDelete.id)));
-        setShowDeletePopup(false);
-        setPostToDelete(null);
-        setToastMessage('Post removed from bookmarks!');
-    };
-    
-    const cancelDeletePost = () => {
-        setShowDeletePopup(false);
-        setPostToDelete(null);
-    };
-    
-    const renderSavedPosts = () => {
-        return savedPosts.map((post, index) => (
-            <div className="bg-gray-700 p-2 rounded mt-2" key={index}>
-                <div className="flex justify-between items-center">
-                    <div className="flex-1 overflow-hidden">
-                        <span className="text-white whitespace-normal">{post.title.replace(/&amp;/g, '&')}</span>
+    const renderPageHeader = () => {
+        return (
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center cursor-pointer" onClick={() => { setSelectedPost(null); setViewingSaved(false); setViewingAbout(false); }}>
+                    <button className="text-white mr-4" onClick={() =>  { setSelectedPost(null); setViewingSaved(false);; setViewingAbout(false); setSidebarOpen(true) }}>
+                        <img src="https://0kb.org/app/zennit/assets/favicon/favicon-96x96.png" alt="Zennit Icon" className="w-8 h-8" />
+                    </button>
+                    <div className="ml-2">
+                        <div className="text-white text-xl sm:text-2xl">
+                            {selectedSubreddit.startsWith('user/') && selectedSubreddit.includes('/m/') 
+                                ? `m/${selectedSubreddit.split('/m/')[1]}`
+                                : selectedSubreddit}
+                        </div>
                     </div>
-                    <div className="text-gray-400 ml-4 flex-shrink-0">
-                        <span className="flex items-center">
-                            <i className="fas fa-arrow-up mr-1"></i>
-                            {formatUpvotes(post.ups)}
-                        </span>
-                    </div>
-                    <button className="ml-4 p-2 bg-gray-600 text-white rounded" onClick={() => viewPost(post.id)}>
-                        View Post
+                </div>
+                <div className="flex items-center">
+                    <select className="p-2 bg-gray-700 text-white rounded" value={sort} onChange={(e) => setSort(e.target.value)}>
+                        <option value="hot">Hot</option>
+                        <option value="new">New</option>
+                        <option value="top">Top</option>
+                        <option value="rising">Rising</option>
+                    </select>
+                    <button className="text-white ml-4" onClick={fetchPosts}>
+                        <i className="fas fa-sync-alt"></i>
+                    </button>
+                    <button className="text-white ml-4" onClick={() => setShowSettings(!showSettings)}>
+                        <i className="fas fa-cog active" id="settingsIcon"></i>
                     </button>
                 </div>
-                <div className="text-gray-400 text-sm mt-1 flex justify-between">
-                    <span>by {post.author}</span>
-                    <span>{formatDate(post.created_utc)}</span>
-                </div>
             </div>
-        ));
+        )
     };
+
+    const renderLoadingSpinner = () => {
+        return (
+            <div className="text-white text-center">
+                <i className="fas fa-yin-yang fa-spin fa-10x"></i>
+            </div>
+        )
+    };
+
+    const renderPostFeed = () => {
+        return (
+            posts.map((post, index) => (
+                <div className="bg-gray-700 p-2 rounded mt-2" key={index}>
+                    <div className="flex justify-between items-center">
+                        <div className="flex-1 overflow-hidden">
+                            <span className="text-white whitespace-normal">{post.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}{post.title.replace(/&amp;/g, '&')}</span>
+                        </div>
+                        <div className="text-gray-400 ml-4 flex-shrink-0">
+                            <span className="flex items-center">
+                                <i className="fas fa-arrow-up mr-1"></i>
+                                {formatUpvotes(post.ups)}
+                            </span>
+                        </div>
+                        <button className="ml-4 p-2 bg-gray-600 text-white rounded" onClick={() => viewPost(post.id)}>
+                            View Post
+                        </button>
+                    </div>
+                    <div className="text-gray-400 text-sm mt-1 flex justify-between">
+                        <span>by {post.author}</span>
+                        <span>{formatDate(post.created_utc)}</span>
+                    </div>
+                </div>
+            ))
+        )
+    };
+
+    useEffect(() => {
+        localStorage.setItem('selectedSubreddit', selectedSubreddit);
+    }, [selectedSubreddit]);
 
     useEffect(() => {
         setPosts([]);
         fetchPosts(currentPage);
     }, [selectedSubreddit, sort]);
 
-    useEffect(() => {
-        localStorage.setItem('subreddits', JSON.stringify(subreddits));
-    }, [subreddits]);
-
-    useEffect(() => {
-        localStorage.setItem('selectedSubreddit', selectedSubreddit);
-    }, [selectedSubreddit]);
-
     const viewPost = (postId) => {
         const post = posts.find(p => p.id === postId) || savedPosts.find(p => p.id === postId);
         setSelectedPost(post);
         fetchComments(postId);
         setViewingSaved(false);
+    };
+
+
+
+    // Sidebar, sidebar subreddits rendering and support functions
+    const renderSidebar = () => {
+        return (
+            <div ref={sidebarRef} className={`fixed inset-y-0 left-0 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out w-64 bg-gray-900 p-4 z-50`}>
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                        <img src="https://0kb.org/app/zennit/assets/favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
+                        <span className="ml-2 text-white text-xl">Zennit</span>
+                    </div>
+                    <button className="text-white" onClick={() => setSidebarOpen(false)}>
+                        <i className="fas fa-arrow-left"></i>
+                    </button>
+                </div>
+                <div className="mb-4">
+                    <h2 className="text-gray-400">Subreddits</h2>
+                    {renderSubreddits()}
+                </div>
+                <div className="mt-4">
+                    <button className="mt-2 w-full p-2 bg-gray-700 text-white rounded" onClick={() => setEditMode(!editMode)}>
+                        {editMode ? 'Done Editing' : 'Edit Subreddits'}
+                    </button>
+                </div>
+                <div className="mt-4">
+                    <input
+                        type="text"
+                        placeholder="Add subreddit"
+                        className="w-full p-2 bg-gray-800 text-white rounded"
+                        value={newSubreddit}
+                        onChange={(e) => setNewSubreddit(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                addSubreddit();
+                            }
+                        }}
+                    />
+                    <button className="mt-2 w-full p-2 bg-gray-700 text-white rounded" onClick={addSubreddit}>Add Subreddit</button>
+                </div>
+            </div>
+        )
+    };
+
+    const renderSubreddits = () => {
+        return subreddits.map((subreddit, index) => (
+            <div className="flex items-center mt-2 cursor-pointer" key={index}>
+                <div 
+                    className="ml-2 text-white" 
+                    onClick={() => {
+                        const subredditToFetch = subreddit.original ? subreddit.original : subreddit.name;
+                        setSelectedSubreddit(subredditToFetch);
+                        setSidebarOpen(false);}}
+                    onContextMenu={(e) => handleRightClick(e, subreddit.name)}
+                >
+                    {subreddit.original ? `m/${subreddit.name}` : subreddit.name}
+                </div>
+                {editMode && (
+                    <button 
+                        className="text-red-500 ml-2" 
+                        onClick={() => {
+                            setSubredditToDelete(subreddit.name);
+                            setShowPopup(true);
+                        }}
+                    >
+                        <i className="fas fa-times"></i>
+                    </button>
+                )}
+            </div>
+        ));
     };
 
     const addSubreddit = () => {
@@ -268,38 +362,24 @@ const App = () => {
         setSubredditToDelete(null);
     };
 
+    const renderSubredditDeletePopup = () => {
+        return (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-gray-800 p-4 rounded">
+                    <div className="text-white mb-4">Do you want to delete {subredditToDelete}?</div>
+                    <div className="flex justify-end">
+                        <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDelete}>Yes</button>
+                        <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDelete}>No</button>
+                    </div>
+                </div>
+            </div>
+        )
+    };
+
     const handleClickOutside = (event) => {
         if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
             setSidebarOpen(false);
         }
-    };
-
-    const renderSubreddits = () => {
-        return subreddits.map((subreddit, index) => (
-            <div className="flex items-center mt-2 cursor-pointer" key={index}>
-                <div 
-                    className="ml-2 text-white" 
-                    onClick={() => {
-                        const subredditToFetch = subreddit.original ? subreddit.original : subreddit.name;
-                        setSelectedSubreddit(subredditToFetch);
-                        setSidebarOpen(false);}}
-                    onContextMenu={(e) => handleRightClick(e, subreddit.name)}
-                >
-                    {subreddit.original ? `m/${subreddit.name}` : subreddit.name}
-                </div>
-                {editMode && (
-                    <button 
-                        className="text-red-500 ml-2" 
-                        onClick={() => {
-                            setSubredditToDelete(subreddit.name);
-                            setShowPopup(true);
-                        }}
-                    >
-                        <i className="fas fa-times"></i> {/* Red X icon */}
-                    </button>
-                )}
-            </div>
-        ));
     };
 
     useEffect(() => {
@@ -313,40 +393,111 @@ const App = () => {
         };
     }, [sidebarOpen]);
 
-    const formatDate = (timestamp) => {
-        const date = new Date(timestamp * 1000);
-        return date.toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    };
+    useEffect(() => {
+        localStorage.setItem('subreddits', JSON.stringify(subreddits));
+    }, [subreddits]);
 
-    const handleTouchStart = (e) => {
-        const touch = e.touches[0];
-        setTouchStartX(touch.clientX);
-    };
 
-    const handleTouchMove = (e) => {
-        if (!touchStartX) return;
-        const touch = e.touches[0];
-        const touchEndX = touch.clientX;
-        const touchDiff = touchEndX - touchStartX;
 
-        if (touchDiff > 50) {
-            setSelectedPost(null);
-        }
-    };
-
-    const [touchStartX, setTouchStartX] = useState(null);
-
-    const Toast = ({ message, onClose }) => {
-        useEffect(() => {
-            const timer = setTimeout(onClose, 3000);
-            return () => clearTimeout(timer);
-        }, [onClose]);
-    
+    // Function to render posts and support functions
+    const renderSelectedPost = () => {
         return (
-            <div className="fixed bottom-4 right-4 bg-green-500 text-white p-2 rounded shadow-lg">
-                {message}
-            </div>
-        );
+            <div>
+                <div className="text-white bg-gray-700 p-2 rounded mt-1 flex flex-col">
+                    <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                            <span className="whitespace-normal">{selectedPost.title.replace(/&amp;/g, '&')}</span>
+                        </div>
+                        <div className="text-gray-400 ml-4 flex-shrink-0">
+                            <span className="flex items-center">
+                                <i className="fas fa-arrow-up mr-1"></i>
+                                {formatUpvotes(selectedPost.ups)}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="text-gray-400 text-sm mt-1 flex justify-between">
+                        <span>by {selectedPost.author}</span>
+                        <span>{formatDate(selectedPost.created_utc)}</span>
+                    </div>
+                </div>
+                <div className="text-white bg-gray-700 p-2 rounded mt-1">
+                        {renderFormattedText(selectedPost.content)}
+                        {renderPostContent(selectedPost)}
+                
+                    <button className="p-2 bg-gray-700 text-white rounded" onClick={() => sharePost(selectedPost.url)}>
+                        <i className="fas fa-share-alt"></i>  Share Post
+                    </button>
+                    <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => savePost(selectedPost)}>
+                        <i class="fas fa-bookmark active" id="bookmarkIcon"></i>  Save Post
+                    </button>
+                </div>
+                <div className="flex items-center justify-between mt-4">
+                    <div className="flex items-center">
+                        <select className="p-2 bg-gray-700 text-white rounded" value={commentSort} onChange={(e) => { setCommentSort(e.target.value); fetchComments(selectedPost.id); }}>
+                            <option value="best">Best</option>
+                            <option value="top">Top</option>
+                            <option value="new">New</option>
+                            <option value="controversial">Controversial</option>
+                        </select>
+                        <button className="text-white ml-4" onClick={() => fetchComments(selectedPost.id)}>
+                            <i className="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+        <div className="text-gray-400 text-sm mt-1">Comments</div>
+            {loadingComments && (
+                <div className="text-white text-center">
+                    <i className="fas fa-yin-yang fa-spin fa-10x"></i>
+                </div>
+            )}
+            {comments.map((comment, index) => (
+                <Comment key={index} comment={comment} />
+            ))}
+            <button className="mt-4 p-2 bg-gray-700 text-white rounded" onClick={() => setSelectedPost(null)}>Back to Posts</button>
+        </div>
+        )
+    };
+
+    const renderPostContent = (post) => {
+        if (post.media && post.media.reddit_video) {
+            return (
+                <video controls width="400" height="400">
+                    <source src={post.media.reddit_video.fallback_url} type="video/mp4" />
+                    Your browser does not support the video tag.
+                </video>
+            );
+        } else if (post.url && post.url.includes("https://www.reddit.com/gallery/")) {
+            return renderGallery(post);
+        } else if (post.url && post.url.includes("youtube.com") || post.url.includes("youtu.be")) {
+            const videoId = post.url.includes("youtu.be") 
+                ? post.url.split('/').pop() 
+                : new URLSearchParams(new URL(post.url).search).get('v');
+            return (
+                <iframe
+                    width="400"
+                    height="400"
+                    src={`https://www.youtube.com/embed/${videoId}`}
+                    frameBorder="0"
+                    allowFullScreen
+                    title="YouTube Video"
+                ></iframe>
+            );
+        } else if (post.url && !post.url.includes("/comments/")) {
+            const isRedditUrl = post.url.includes("reddit.com") || post.url.includes("redd.it");
+            return isRedditUrl ? (
+                <img 
+                    src={post.url} 
+                    alt="Post content" 
+                    className="mt-2 rounded max-w-full cursor-pointer" 
+                    height="30%" 
+                    width="30%" 
+                    onClick={() => handleImageClick(post.url)}
+                />
+            ) : (
+                <a href={post.url} className="text-blue-500 underline mt-2 block">{post.url}</a>
+            );
+        }
+        return null;
     };
 
     const renderGallery = (post) => {
@@ -373,18 +524,28 @@ const App = () => {
             </div>
         );
     };
-    const decodeHtmlEntities = (text) => {
-        const textarea = document.createElement('textarea');
-        textarea.innerHTML = text;
-        return textarea.value;
+
+    const renderEnlargedPostImages = () => {
+        return (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75" onClick={handleCloseImage}>
+                <img src={enlargedImage} alt="Enlarged" className="max-w-full max-h-full" />
+            </div>
+        )
+    };
+
+    const handleImageClick = (src) => {
+        setEnlargedImage(src);
+    };
+
+    const handleCloseImage = () => {
+        setEnlargedImage(null);
     };
 
     const renderFormattedText = (text) => {
-        console.log("text: ", text);
         if (!text || typeof text !== 'string') {
             return null;
         }
-        const decodedText = decodeHtmlEntities(text);
+        
         let formattedText = text;
         formattedText = formattedText.replace(/\\/g, '');
         formattedText = formattedText.replace(/\n\n+/g, '\n');
@@ -396,20 +557,23 @@ const App = () => {
             imageUrls.push(decodedUrl);
             return '';
         });
-        
-        // Handle blockquotes
-        
-        formattedText = formattedText.replace(/^\s*>\s*(.+)$/gm, (match, content) => {
-            console.log("Matched blockquote content:", content); // Debugging line
+
+        const spoilerRegex = /(&gt;!)?(.*?)!(&lt;)/g;
+        formattedText = formattedText.replace(spoilerRegex, (match, start, content, end) => {
+            return `<span class="spoiler" onclick="this.classList.toggle('revealed');">${content}</span>`;
+        });
+
+        formattedText = formattedText.replace(/^\s*&gt;\s*(.+)$/gm, (match, content) => {
             return `<blockquote style="border-left: 4px solid #ccc; padding-left: 10px; color: #999;">${content.trim()}</blockquote>`;
         });
+
 
         formattedText = formattedText.replace(/^(#{1,6})\s*(.+)$/gm, (match, hashes, content) => {
             const level = hashes.length;
             const fontSize = `${(6 - level) * 0.25 + 1}em`;
             return `<h${level} style="font-size: ${fontSize}; font-weight: bold;">${content}</h${level}>`;
         });
-        
+
         const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
         formattedText = formattedText.replace(linkRegex, (match, p1, p2) => {
             return `<a href="${p2}" class="text-blue-500 underline">${p1}</a>`;
@@ -454,7 +618,6 @@ const App = () => {
         });
     
         formattedText = formattedText.replace(/\n/g, '<br/>');
-        console.log("Formatted text:", formattedText);
         return (
             <div>
                 <span dangerouslySetInnerHTML={{ __html: formattedText }} />
@@ -471,69 +634,6 @@ const App = () => {
                 ))}
             </div>
         );
-    };
-
-    const handleCloseCommentImage = () => {
-        setEnlargedCommentImage(null);
-    };
-    
-    const handleClickOutsideCommentImage = (event) => {
-        if (enlargedCommentImage && !event.target.classList.contains('comment-image')) {
-            handleCloseCommentImage();
-        }
-    };
-    
-    useEffect(() => {
-        if (enlargedCommentImage) {
-            document.addEventListener('mousedown', handleClickOutsideCommentImage);
-        } else {
-            document.removeEventListener('mousedown', handleClickOutsideCommentImage);
-        }
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutsideCommentImage);
-        };
-    }, [enlargedCommentImage]);
-
-    const renderPostContent = (post) => {
-        if (post.media && post.media.reddit_video) {
-            return (
-                <video controls width="400" height="400">
-                    <source src={post.media.reddit_video.fallback_url} type="video/mp4" />
-                    Your browser does not support the video tag.
-                </video>
-            );
-        } else if (post.url && post.url.includes("https://www.reddit.com/gallery/")) {
-            return renderGallery(post);
-        } else if (post.url && post.url.includes("youtube.com") || post.url.includes("youtu.be")) {
-            const videoId = post.url.includes("youtu.be") 
-                ? post.url.split('/').pop() 
-                : new URLSearchParams(new URL(post.url).search).get('v');
-            return (
-                <iframe
-                    width="400"
-                    height="400"
-                    src={`https://www.youtube.com/embed/${videoId}`}
-                    frameBorder="0"
-                    allowFullScreen
-                    title="YouTube Video"
-                ></iframe>
-            );
-        } else if (post.url && !post.url.includes("/comments/")) {
-            const isRedditUrl = post.url.includes("reddit.com") || post.url.includes("redd.it");
-            return isRedditUrl ? (
-                <img 
-                    src={post.url} 
-                    alt="Post content" 
-                    className="mt-2 rounded max-w-full cursor-pointer" 
-                    height="30%" 
-                    width="30%" 
-                    onClick={() => handleImageClick(post.url)}
-                />
-            ) : (
-                <a href={post.url} className="text-blue-500 underline mt-2 block">{post.url}</a>
-            );
-        }
-        return null;
     };
 
     const sharePost = (url) => {
@@ -557,7 +657,18 @@ const App = () => {
             });
         }
     };
+    
+    const savePost = (post) => {
+        if (!savedPosts.some(savedPost => savedPost.id === post.id)) {
+            const updatedSavedPosts = [...savedPosts, post];
+            setSavedPosts(updatedSavedPosts);
+            localStorage.setItem('savedPosts', JSON.stringify(updatedSavedPosts));
+            setToastMessage('Post saved!');
+        }
+    };
 
+
+    // Comment components and support functions
     const Comment = ({ comment }) => {
         const [isVisible, setIsVisible] = useState(true);
         
@@ -590,207 +701,248 @@ const App = () => {
             </div>
         );
     };
+
+    const toggleCommentVisibility = (index) => {
+        const updatedVisibility = [...commentVisibility];
+        updatedVisibility[index] = !updatedVisibility[index];
+        setCommentVisibility(updatedVisibility);
+    };
+
+    const renderEnlargedCommentImages = () => {
+        return (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75" onClick={handleCloseCommentImage}>
+                    <img src={enlargedCommentImage} alt="Enlarged Comment" className="max-w-full max-h-full" />
+                </div>
+        )
+    };
+
+    const handleCloseCommentImage = () => {
+        setEnlargedCommentImage(null);
+    };
     
+    const handleClickOutsideCommentImage = (event) => {
+        if (enlargedCommentImage && !event.target.classList.contains('comment-image')) {
+            handleCloseCommentImage();
+        }
+    };
+
+    useEffect(() => {
+        if (enlargedCommentImage) {
+            document.addEventListener('mousedown', handleClickOutsideCommentImage);
+        } else {
+            document.removeEventListener('mousedown', handleClickOutsideCommentImage);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutsideCommentImage);
+        };
+    }, [enlargedCommentImage]);
+
+
+    // Settings page, components and functions
+    const SettingsPage = ({ onClose, onViewSavedPosts }) => {
+        return (
+            <div className="bg-gray-800 p-4 rounded">
+                <h2 className="text-white text-xl mb-4">Settings</h2>
+                <button className="mt-2 w-full p-2 bg-gray-700 text-white rounded" onClick={handleViewSavedPosts}>
+                    View Saved Posts
+                </button>
+                <button className="mt-2 w-full p-2 bg-gray-700 text-white rounded" onClick={clearCache}>
+                    Clear Cache/Data
+                </button>
+                <button className="mt-2 w-full p-2 bg-gray-700 text-white rounded" onClick={handleViewAbout}>
+                    About Zennit
+                </button>
+                <button className="mt-2 w-full p-2 bg-gray-700 text-white rounded" onClick={onClose}>
+                    Close
+                </button>
+                {showClearCachePopup && renderClearCachePopup()}
+            </div>
+        );
+    };
+
+    //_ Function and support functions for saved posts
+    const renderSavedPosts = () => {
+        return savedPosts.map((post, index) => (
+            <div className="bg-gray-700 p-2 rounded mt-2" key={index}>
+                <div className="flex justify-between items-center">
+                    <div className="flex-1 overflow-hidden">
+                        <span className="text-white whitespace-normal">{post.title.replace(/&amp;/g, '&')}</span>
+                    </div>
+                    <div className="text-gray-400 ml-4 flex-shrink-0">
+                        <span className="flex items-center">
+                            <i className="fas fa-arrow-up mr-1"></i>
+                            {formatUpvotes(post.ups)}
+                        </span>
+                    </div>
+                    <button className="ml-4 p-2 bg-gray-600 text-white rounded" onClick={() => viewPost(post.id)}>
+                        View Post
+                    </button>
+                </div>
+                <div className="text-gray-400 text-sm mt-1 flex justify-between">
+                    <span>by {post.author}</span>
+                    <span>{formatDate(post.created_utc)}</span>
+                </div>
+                {editMode && (
+                        <button 
+                            className="text-red-500 ml-2" 
+                            onClick={() => {
+                                setPostToDelete(post);
+                                setShowDeletePopup(true);
+                            }}
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                    )
+                }
+            </div>
+        ));
+    };
+
+    const renderViewSavedPost = () => {
+        return (
+            <div>
+                <h2 className="text-white text-xl mb-4">Saved Posts</h2>
+                <div className="text-gray-400 text-sm mb-4">
+                <h3 className="text-gray-400 text-sm mt-1" onClick={() => setEditMode(!editMode)}>Edit saved posts</h3>
+                {renderSavedPosts()}
+                </div>
+            </div>
+        )
+    }
+
+    const renderDeleteSavedPostPopup = () => {
+        return (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-gray-800 p-4 rounded">
+                    <div className="text-white mb-4">Do you want to delete {postToDelete.title}?</div>
+                    <div className="flex justify-end">
+                        <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDeletePost}>Yes</button>
+                        <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDeletePost}>No</button>
+                    </div>
+                </div>
+            </div>
+        )
+    };
+
+    const handleSavedPostRightClick = (e, post) => {
+        e.preventDefault();
+        setPostToDelete(post);
+        setShowDeletePopup(true);
+    };
+
+    const confirmDeletePost = () => {
+        setSavedPosts(savedPosts.filter(p => p.id !== postToDelete.id));
+        localStorage.setItem('savedPosts', JSON.stringify(savedPosts.filter(p => p.id !== postToDelete.id)));
+        setShowDeletePopup(false);
+        setPostToDelete(null);
+        setToastMessage('Post removed from bookmarks!');
+    };
+    
+    const cancelDeletePost = () => {
+        setShowDeletePopup(false);
+        setPostToDelete(null);
+    };
+
+    const handleViewSavedPosts = () => {
+        setViewingSaved(true);
+        setShowSettings(false);
+    };
+
+    const renderClearCachePopup = () => {
+        return (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-gray-800 p-4 rounded">
+                    <div className="text-white mb-4">Are you sure you want to clear the cache? This action cannot be undone.</div>
+                    <div className="flex justify-end">
+                        <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmClearCache}>Yes</button>
+                        <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelClearCache}>No</button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const clearCache = () => {
+        setShowClearCachePopup(true);
+    };
+
+    const confirmClearCache = () => {
+        localStorage.clear();
+        setSubreddits(() => JSON.parse(localStorage.getItem('subreddits') || '[{"name": "r/Zennit"}]'));
+        setSelectedSubreddit(localStorage.getItem('selectedSubreddit') || 'r/Zennit');
+        setSavedPosts(JSON.parse(localStorage.getItem('savedPosts') || '[]'));
+        setToastMessage('Cache cleared successfully!');
+        setShowClearCachePopup(false);
+    };
+    
+    const cancelClearCache = () => {
+        setShowClearCachePopup(false);
+    };
+
+    const renderAbout = () => {
+        return (
+            <div className="bg-gray-800 p-4 rounded">
+                <h2 className="text-white text-xl mb-4">About Zennit</h2>
+                <p className="text-gray-400 mb-2">
+                    Zennit started as a creative project to fill some time. Being a frequent lurker on Reddit, ads, highly cluttered interfaces, and much more always bothered me. I opted to build an entirely minimal "zen" frontend instead.
+                </p>
+                <p className="text-gray-400 mb-2">
+                    My goal with Zennit is to create a clean and user-friendly interface for browsing Reddit, focusing on simplicity and ease of use. I hope to continue improving it and adding features that enhance the user experience.
+                </p>
+                <div className="flex items-center mt-4">
+                    <a href="https://github.com/9-5/Zennit" target="_blank" rel="noopener noreferrer" className="flex items-center text-blue-500 hover:underline mr-4">
+                        <i className="fab fa-github mr-2"></i>
+                        GitHub Repo
+                    </a>
+                    <a href="https://johnle.org" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                        Developer's Page
+                    </a>
+                </div>
+            </div>
+        );
+    };
+
+    const handleViewAbout = () => {
+        setViewingAbout(true);
+        setShowSettings(false);
+    };
+
+
+
+    // Miscellaneous functions
+    const Toast = ({ message, onClose }) => {
+        useEffect(() => {
+            const timer = setTimeout(onClose, 3000);
+            return () => clearTimeout(timer);
+        }, [onClose]);
+    
+        return (
+            <div className="fixed bottom-4 right-4 bg-green-500 text-white p-2 rounded shadow-lg">
+                {message}
+            </div>
+        );
+    };
+
+
+
     return (
         <div className="flex h-screen">
-            <div ref={sidebarRef} className={`fixed inset-y-0 left-0 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out w-64 bg-gray-900 p-4 z-50`}>
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center">
-                        <img src="https://0kb.org/app/zennit/assets/favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
-                        <span className="ml-2 text-white text-xl">Zennit</span>
-                    </div>
-                    <button className="text-white" onClick={() => setSidebarOpen(false)}>
-                        <i className="fas fa-arrow-left"></i>
-                    </button>
-                </div>
-                <div className="mb-4">
-                    <h2 className="text-gray-400">Subreddits</h2>
-                    {renderSubreddits()}
-                </div>
-                <div className="mt-4">
-                    <button className="mt-2 w-full p-2 bg-gray-700 text-white rounded" onClick={() => setEditMode(!editMode)}>
-                        {editMode ? 'Done Editing' : 'Edit Subreddits'}
-                    </button>
-                </div>
-                <div className="mt-4">
-                    <input
-                        type="text"
-                        placeholder="Add subreddit"
-                        className="w-full p-2 bg-gray-800 text-white rounded"
-                        value={newSubreddit}
-                        onChange={(e) => setNewSubreddit(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                addSubreddit();
-                            }
-                        }}
-                    />
-                    <button className="mt-2 w-full p-2 bg-gray-700 text-white rounded" onClick={addSubreddit}>Add Subreddit</button>
-                </div>
-                {showPopup && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-gray-800 p-4 rounded">
-                        <div className="text-white mb-4">Do you want to delete {subredditToDelete}?</div>
-                        <div className="flex justify-end">
-                            <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDelete}>Yes</button>
-                            <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDelete}>No</button>
-                        </div>
-                    </div>
-                </div>
-                )}
+            <div>
+                {renderSidebar()}
+                {showPopup && (renderSubredditDeletePopup())}
             </div>
             <div className="flex-1 bg-gray-800 p-4 flex flex-col">
-            {contentBlockerDetected && (
-                <div className="bg-red-600 text-white p-4 rounded mb-4">
-                    <p>It seems that a content blocker is preventing posts from being fetched. Please disable your content blocker and refresh the page.</p>
-                    <button 
-                        className="mt-2 p-2 bg-gray-700 text-white rounded" 
-                        onClick={() => window.location.reload()}
-                    >
-                        Refresh Page
-                    </button>
+                {contentBlockerDetected && (renderContentBlocked())}
+                {renderPageHeader()}
+                {showSettings && <SettingsPage onClose={() => setShowSettings(false)} onViewSavedPosts={handleViewSavedPosts} />}
+                <div className="flex-1 overflow-y-auto">
+                    {loadingPosts && (renderLoadingSpinner())}
+                    {viewingSaved ? (renderViewSavedPost()) : selectedPost ? (renderSelectedPost()) : viewingAbout ? (renderAbout()) : (renderPostFeed())}
                 </div>
-            )}
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center cursor-pointer" onClick={() => { setSelectedPost(null); setViewingSaved(false); }}>
-                        <button className="text-white mr-4" onClick={() =>  { setSelectedPost(null); setViewingSaved(false); setSidebarOpen(true) }}>
-                            <img src="https://0kb.org/app/zennit/assets/favicon/favicon-96x96.png" alt="Reddit Icon" className="w-8 h-8" />
-                        </button>
-                        <div className="ml-2">
-                            <div className="text-white text-xl sm:text-2xl">
-                                {selectedSubreddit.startsWith('user/') && selectedSubreddit.includes('/m/') 
-                                    ? `m/${selectedSubreddit.split('/m/')[1]}`
-                                    : selectedSubreddit}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center">
-                        <select className="p-2 bg-gray-700 text-white rounded" value={sort} onChange={(e) => setSort(e.target.value)}>
-                            <option value="hot">Hot</option>
-                            <option value="new">New</option>
-                            <option value="top">Top</option>
-                            <option value="rising">Rising</option>
-                        </select>
-                        <button className="text-white ml-4" onClick={fetchPosts}>
-                            <i className="fas fa-sync-alt"></i>
-                        </button>
-                        <button className="text-white ml-4" onClick={() => setViewingSaved(!viewingSaved)}>
-                            {viewingSaved ? <i class="fas fa-bookmark inactive" id="bookmarkIcon"></i> : <i class="fas fa-bookmark active" id="bookmarkIcon"></i>}
-                        </button>
-                    </div>
-                </div>
-                <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
-                    {loadingPosts && (
-                        <div className="text-white text-center">
-                            <i className="fas fa-yin-yang fa-spin fa-10x"></i>
-                        </div>
-                    )}
-                    {viewingSaved ? (
-                        <div>
-                            <h2 className="text-white text-xl mb-4">Saved Posts</h2>
-                            <div className="text-gray-400 text-sm mb-4">
-                            <h3 className="text-gray-400 text-sm mt-1" onClick={() => setEditMode(!editMode)}>Edit saved posts</h3>
-                            {renderSavedPosts()}
-                            </div>
-                        </div>
-                    ) : selectedPost ? (
-                        <div>
-                            <div className="text-white bg-gray-700 p-2 rounded mt-1 flex items-center">
-                                {selectedPost.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}
-                                <span>{selectedPost.title.replace(/&amp;/g, '&')}</span>
-                                <span className="text-gray-400 ml-2 flex items-center">
-                                    <i className="fas fa-arrow-up mr-1"></i>
-                                    {formatUpvotes(selectedPost.ups)} upvotes
-                                </span>
-                            </div>
-                            <div className="text-gray-400 text-sm mt-1 flex justify-between">
-                                <span>by {selectedPost.author}</span>
-                                <span>{formatDate(selectedPost.created_utc)}</span>
-                            </div>
-                            <div className="text-white bg-gray-700 p-2 rounded mt-1">
-                                {renderFormattedText(selectedPost.content)}
-                                {renderPostContent(selectedPost)}
-                            </div>
-                            <div className="flex items-center mt-4">
-                                <button className="p-2 bg-gray-700 text-white rounded" onClick={() => sharePost(selectedPost.url)}>
-                                    <i className="fas fa-share-alt"></i> Share Post
-                                </button>
-                                <button className="ml-4 p-2 bg-gray-700 text-white rounded" onClick={() => savePost(selectedPost)}>
-                                    <i class="fas fa-bookmark inactive" id="bookmarkIcon"></i> Save Post
-                                </button>
-
-                            </div>
-                            <div className="flex items-center justify-between mt-4">
-                                <div className="flex items-center">
-                                    <select className="p-2 bg-gray-700 text-white rounded" value={commentSort} onChange={(e) => { setCommentSort(e.target.value); fetchComments(selectedPost.id); }}>
-                                        <option value="best">Best</option>
-                                        <option value="top">Top</option>
-                                        <option value="new">New</option>
-                                        <option value="controversial">Controversial</option>
-                                    </select>
-                                    <button className="text-white ml-4" onClick={() => fetchComments(selectedPost.id)}>
-                                        <i className="fas fa-sync-alt"></i>
-                                    </button>
-                                </div>
-                            </div>
-                    <div className="text-gray-400 text-sm mt-1">Comments</div>
-                        {loadingComments && (
-                            <div className="text-white text-center">
-                                <i className="fas fa-yin-yang fa-spin fa-10x"></i>
-                            </div>
-                        )}
-                        {comments.map((comment, index) => (
-                            <Comment key={index} comment={comment} />
-                        ))}
-                        <button className="mt-4 p-2 bg-gray-700 text-white rounded" onClick={() => setSelectedPost(null)}>Back to Posts</button>
-                    </div>
-                ) : (
-                    posts.map((post, index) => (
-                        <div className="bg-gray-700 p-2 rounded mt-2" key={index}>
-                            <div className="flex justify-between items-center">
-                                <div className="flex-1 overflow-hidden">
-                                    <span className="text-white whitespace-normal">{post.pinned && <i className="fas fa-thumbtack text-yellow-500 mr-2"></i>}{post.title.replace(/&amp;/g, '&')}</span>
-                                </div>
-                                <div className="text-gray-400 ml-4 flex-shrink-0">
-                                    <span className="flex items-center">
-                                        <i className="fas fa-arrow-up mr-1"></i>
-                                        {formatUpvotes(post.ups)}
-                                    </span>
-                                </div>
-                                <button className="ml-4 p-2 bg-gray-600 text-white rounded" onClick={() => viewPost(post.id)}>
-                                    View Post
-                                </button>
-                            </div>
-                            <div className="text-gray-400 text-sm mt-1 flex justify-between">
-                                <span>by {post.author}</span>
-                                <span>{formatDate(post.created_utc)}</span>
-                            </div>
-                        </div>
-                    ))
-                )}
-                </div>
-                {enlargedImage && (
-                    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75" onClick={handleCloseImage}>
-                        <img src={enlargedImage} alt="Enlarged" className="max-w-full max-h-full" />
-                    </div>
-                )}
-                {enlargedCommentImage && (
-                    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75" onClick={handleCloseCommentImage}>
-                        <img src={enlargedCommentImage} alt="Enlarged Comment" className="max-w-full max-h-full" />
-                    </div>
-                )}
+                {enlargedImage && (renderEnlargedPostImages())}
+                {enlargedCommentImage && (renderEnlargedCommentImages())}
             </div>
-            {showDeletePopup && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-gray-800 p-4 rounded">
-                        <div className="text-white mb-4">Do you want to delete {postToDelete.title}?</div>
-                        <div className="flex justify-end">
-                            <button className="p-2 bg-gray-700 text-white rounded mr-2" onClick={confirmDeletePost}>Yes</button>
-                            <button className="p-2 bg-gray-700 text-white rounded" onClick={cancelDeletePost}>No</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {showDeletePopup && (renderDeleteSavedPostPopup())}
             {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage('')} />}
         </div>
     )
