@@ -27,8 +27,10 @@ const App = () => {
     const [editMode, setEditMode] = useState(false);
     const [enlargedImage, setEnlargedImage] = useState(null);
     const [enlargedCommentImage, setEnlargedCommentImage] = useState(null);
-    //const [touchStartX, setTouchStartX] = useState(null);
-    //const [touchEndX, setTouchEndX] = useState(null);
+    const [isSwiping, setIsSwiping] = useState(false);
+    const swipeThreshold = 50;
+    const [touchStartX, setTouchStartX] = useState(null);
+    const [touchEndX, setTouchEndX] = useState(null);
     const [showSettings, setShowSettings] = useState(false);
     const [viewingAbout, setViewingAbout] = useState(false);
     const [showClearCachePopup, setShowClearCachePopup] = useState(false);
@@ -923,10 +925,48 @@ const App = () => {
         );
     };
 
-
+    const handleTouchStart = (e) => {
+        const touch = e.touches[0];
+        setTouchStartX(touch.clientX);
+        setIsSwiping(false); // Reset swiping flag
+    };
+    
+    const handleTouchMove = (e) => {
+        const touch = e.touches[0];
+        setTouchEndX(touch.clientX);
+        const touchDiff = touchEndX - touchStartX;
+    
+        // If the touch moves beyond the threshold, set isSwiping to true
+        if (Math.abs(touchDiff) > swipeThreshold) {
+            setIsSwiping(true);
+        }
+    };
+    
+    const handleTouchEnd = () => {
+        if (touchStartX === null || touchEndX === null) return;
+    
+        const touchDiff = touchEndX - touchStartX;
+    
+        // Only open the sidebar if it's a swipe gesture
+        if (isSwiping) {
+            if (touchDiff > swipeThreshold) {
+                setSidebarOpen(true); // Swipe right to open sidebar
+            } else if (touchDiff < -swipeThreshold && selectedPost) {
+                setSelectedPost(null); // Swipe left to close post
+            }
+        } else {
+            // Handle tap actions here (e.g., opening settings, enlarging images)
+            // You can add logic to handle taps on specific elements
+        }
+    
+        // Reset touch states
+        setTouchStartX(null);
+        setTouchEndX(null);
+        setIsSwiping(false);
+    };
 
     return (
-        <div className="flex h-screen">
+        <div className="flex h-screen" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
             <div>
                 {renderSidebar()}
                 {showPopup && (renderSubredditDeletePopup())}
